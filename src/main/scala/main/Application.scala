@@ -1,54 +1,37 @@
 package main
 
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
-import scala.io.StdIn
+import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
+
 import scala.concurrent.Await
+import scala.language.postfixOps
 
 object Application extends App {
-  val PORT = "18089"
-  /* val PORT = "18089"
+  val PORT = 8080
 
-   implicit val actorSystem = akka.actor.typed.ActorSystem("TheSystem")
+  implicit val actorSystem = ActorSystem("graphql-server")
+  implicit val materializer = ActorMaterializer()
 
-   import actorSystem.dispatcher
-   import scala.concurrent.duration._
+  import actorSystem.dispatcher
 
-   scala.sys.addShutdownHook(() -> shutdown())
+  import scala.concurrent.duration._
 
-   val route: Route = get {
-     complete("Hello world")
-   }
-   Http().newServerAt(route, "0.0.0.0", PORT)
-   println(s"open a browser with URL: http://localhost:$PORT")
+  scala.sys.addShutdownHook(() -> shutdown())
 
-   private def shutdown(): Unit = {
-     actorSystem.terminate()
-     Await.result(actorSystem.whenTerminated, 30 seconds)
-   }*/
+  //3
+  val route: Route = {
+    complete("Hello GraphQL Scala!!!")
+  }
 
-  implicit val system = ActorSystem(Behaviors.empty, "my-system")
-  implicit val executionContext = system.executionContext
+  Http().bindAndHandle(route, "0.0.0.0", PORT)
+  println(s"open a browser with URL: http://localhost:$PORT")
 
-  val route =
-    path("") {
-      get {
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to akka-http</h1>"))
-      }
-    }
 
-  private val bindingFuture = Http().newServerAt("localhost", PORT).bind(route)
-
-  println(s"Server now online. Please navigate to http://localhost:${PORT}/ \nPress RETURN to stop...")
-
-  StdIn.readLine()
-
-  bindingFuture
-    .flatMap(_.unbind()) // trigger unbinding from the port
-    .onComplete(_ => {
-      system.terminate() // and shutdown when done
-    })
+  def shutdown(): Unit = {
+    actorSystem.terminate()
+    Await.result(actorSystem.whenTerminated, 30 seconds)
+  }
 }
