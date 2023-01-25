@@ -8,6 +8,10 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
 
+/**
+ * file defines what we want to expose.
+ * There are defined types (from GraphQL point of view) and shape of the schema a client is able to query for.
+ */
 object DBSchema {
   class PatientTable(tag: Tag) extends Table[Patient](tag, "PATIENT") {
     def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)

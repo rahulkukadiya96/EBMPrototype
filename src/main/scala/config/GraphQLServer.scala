@@ -14,6 +14,12 @@ import spray.json.{JsObject, JsString, JsValue}
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
+/**
+ * This object will be in the second layer of architecture, just after HTTP server.
+ * Proper HTTP request will be converted into JSON object and sent to this server.
+ * GraphQL Server will parse that JSON as GraphQL query, execute it and through HTTP layer send response back to the client.
+ * It will also catch GraphQL parsing errors and convert those into the proper HTTP responses.
+ */
 object GraphQLServer {
   private val dao = DBSchema.createDatabase
 
@@ -42,7 +48,7 @@ object GraphQLServer {
   private def executeGraphQLQuery(query: Document, operation: Option[String], vars: JsObject)(implicit ec: ExecutionContext) = {
     // 9
     Executor.execute(
-      GraphQLSchema.SchemaDefinition,
+      GraphQLSchema.schemaDefinition,
       query,
       MyContext(dao),
       variables = vars,
