@@ -43,31 +43,39 @@ object DBSchema {
   class CCEncounterTable(tag: Tag) extends Table[CCEncounter](tag, "CC_ENCOUNTER") {
     def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
 
-    def signs = column[String]("signs")
+    def signs = column[String]("SIGNS")
 
-    def symptoms = column[String]("symptoms")
+    def symptoms = column[String]("SYMPTOMS")
 
     def createdDate = column[LocalDateTime]("CREATED_AT")
 
-    def * = (id, signs, symptoms, createdDate).mapTo[CCEncounter]
+    def subjectiveId = column[Int]("SUBJECTIVE_ID")
+
+    def * = (id, subjectiveId, signs, symptoms, createdDate).mapTo[CCEncounter]
+
+    def subjectiveIdFK = foreignKey("FK_CC_ENCOUNTER_SUBJECTIVE", subjectiveId, subjective)(_.id)
   }
 
   class PatientMedicalHistoryTable(tag: Tag) extends Table[PatientMedicalHistory](tag, "PMH") {
     def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
 
-    def medications = column[String]("medications")
+    def medications = column[String]("MEDICATIONS")
 
-    def allergies = column[String]("allergies")
+    def allergies = column[String]("ALLERGIES")
 
-    def procedure = column[String]("procedure")
+    def procedure = column[String]("PROCEDURE")
 
-    def familyHistory = column[String]("familyHistory")
+    def familyHistory = column[String]("FAMILY_HISTORY")
 
-    def demographics = column[String]("demographics")
+    def demographics = column[String]("DEMOGRAPHIC")
 
     def createdDate = column[LocalDateTime]("CREATED_AT")
 
-    override def * : ProvenShape[PatientMedicalHistory] = (id, medications, allergies, procedure, familyHistory, demographics, createdDate).mapTo[PatientMedicalHistory]
+    def subjectiveId = column[Int]("SUBJECTIVE_ID")
+
+    override def * : ProvenShape[PatientMedicalHistory] = (id, subjectiveId, medications, allergies, procedure, familyHistory, demographics, createdDate).mapTo[PatientMedicalHistory]
+
+    def subjectiveIdFK = foreignKey("FK_PMH_SUBJECTIVE", subjectiveId, subjective)(_.id)
   }
 
   class SubjectiveTable(tag: Tag) extends Table[Subjective](tag, "SUBJECTIVE") {
@@ -79,7 +87,7 @@ object DBSchema {
 
     def createdDate = column[LocalDateTime]("CREATED_AT")
 
-    def * = (id, pmhId, ccEncId, createdDate).mapTo[Subjective]
+    def * = (id, createdDate).mapTo[Subjective]
   }
 
   val patientList = TableQuery[PatientTable]
@@ -95,21 +103,21 @@ object DBSchema {
       Patient(2, "Rahul", 25, LocalDateTime of(2020, 8, 9, 5, 36)),
       Patient(3, "Terrace", 78, LocalDateTime of(2016, 8, 8, 1, 27))
     ),
+    subjective.schema.create,
+    subjective forceInsertAll Seq(
+      Subjective(1),
+      Subjective(2),
+    ),
     ccEncounters.schema.create,
     ccEncounters forceInsertAll Seq(
-      CCEncounter(1, "Abdominal Pain", "Stomach Infection"),
-      CCEncounter(2, "Coughing", "Viral Infection"),
+      CCEncounter(1, 1, "Abdominal Pain", "Stomach Infection"),
+      CCEncounter(2, 2, "Coughing", "Viral Infection"),
     ),
     patientMedicalHistory.schema.create,
     patientMedicalHistory forceInsertAll Seq(
-      PatientMedicalHistory(1, "Paracetamol", "Skin", "Medication", " No family history", "Asian"),
-      PatientMedicalHistory(2, "Bitadin", "Skin", "Medication", " No family history", "Asian"),
+      PatientMedicalHistory(1, 1, "Paracetamol", "Skin", "Medication", " No family history", "Asian"),
+      PatientMedicalHistory(2, 2, "Bitadin", "Skin", "Medication", " No family history", "Asian"),
     ),
-    subjective.schema.create,
-    subjective forceInsertAll Seq(
-      Subjective(1, 1, 1),
-      Subjective(2, 1, 2),
-    )
   )
 
 

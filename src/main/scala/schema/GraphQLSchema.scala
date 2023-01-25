@@ -1,14 +1,14 @@
 package schema
 
 import config.MyContext
-import models.{CCEncounter, Identifiable, LocalDateTimeCoerceViolation, Patient, PatientMedicalHistory, Subjective}
+import models._
 import sangria.ast.StringValue
-import sangria.execution.deferred.{DeferredResolver, Fetcher, HasId}
-import sangria.macros.derive.{Interfaces, ReplaceField, deriveObjectType}
+import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
+import sangria.macros.derive.{AddFields, Interfaces, ReplaceField, deriveObjectType}
 import sangria.schema._
+import utility.DateTimeFormatUtil
 
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
 
 object GraphQLSchema {
@@ -17,25 +17,6 @@ object GraphQLSchema {
   private val Id = Argument("id", IntType)
   private val Ids = Argument("ids", ListInputType(IntType))
 
-  object DateTimeFormatUtil {
-    def fromStrToDate(format: DateTimeFormatter, date: String): Option[LocalDateTime] = {
-      try {
-        Some(LocalDateTime.parse(date, format))
-      }
-      catch {
-        case _: Exception => None
-      }
-    }
-
-    def fromDateToStr(format: DateTimeFormatter, date: LocalDateTime): Option[String] = {
-      try {
-        Some(format.format(date))
-      }
-      catch {
-        case _: Exception => None
-      }
-    }
-  }
 
   /**
    * conversions between custom data type (LocalDateTime) and type Sangria understand and then back again to custom type.
@@ -72,34 +53,42 @@ object GraphQLSchema {
   /**
    * For the CC Encounter type
    */
-  private val ccEncounterType = deriveObjectType[Unit, CCEncounter](
+  private val CCEncounterType = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
+    // ReplaceField("subjectiveId", Field("subjective", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
   // implicit val ccEncounterHasId: HasId[CCEncounter, Int] = HasId[CCEncounter, Int](_.id)
-  private val ccEncounterFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getCCEncounter(ids)
+  private val ccEncounterFetcherBySubjectiveRel = Relation[CCEncounter, Int]("bySubjectiveId", l => Seq(l.subjectiveId))
+  private val ccEncounterFetcher = Fetcher.rel(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getCCEncounter(ids),
+    (ctx: MyContext, ids: RelationIds[CCEncounter]) => ctx.dao.getCCEncounterBySubjective(ids(ccEncounterFetcherBySubjectiveRel))
   )
 
   /**
    * For the PatientMedicalHistoryTable type
    */
-  private val patientMedicalHistoryType = deriveObjectType[Unit, PatientMedicalHistory](
+  private val PatientMedicalHistoryType = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
+     // ReplaceField("subjectiveId", Field("subjective", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
   // implicit val patientMedicalHistoryHasId: HasId[PatientMedicalHistory, Int] = HasId[PatientMedicalHistory, Int](_.id)
-  private val patientMedicalHistoryFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPatientMedicalHistory(ids)
+  private val patientMedicalHistoryBySubjectiveRel = Relation[PatientMedicalHistory, Int]("bySubjectiveId", l => Seq(l.subjectiveId))
+  private val patientMedicalHistoryFetcher = Fetcher.rel(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPatientMedicalHistory(ids),
+    (ctx: MyContext, ids: RelationIds[PatientMedicalHistory]) => ctx.dao.getPatientMedicalHistoryBySubjective(ids(patientMedicalHistoryBySubjectiveRel))
   )
 
   /**
    * For the CC SubjectiveTable type
    */
-  private val subjectiveType = deriveObjectType[Unit, Subjective](
+  lazy private val SubjectiveType = deriveObjectType[Unit, Subjective](
     Interfaces(IdentifiableType),
+    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
+    AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
   )
 
@@ -141,19 +130,19 @@ object GraphQLSchema {
       ),
       Field(
         "subjectives",
-        OptionType(ListType(subjectiveType)),
+        OptionType(ListType(SubjectiveType)),
         arguments = List(Ids),
         resolve = config => subjectiveFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
         "ccEncounters",
-        OptionType(ListType(ccEncounterType)),
+        OptionType(ListType(CCEncounterType)),
         arguments = List(Ids),
         resolve = config => ccEncounterFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
         "patientMedicalHistories",
-        OptionType(ListType(patientMedicalHistoryType)),
+        OptionType(ListType(PatientMedicalHistoryType)),
         arguments = List(Ids),
         resolve = config => patientMedicalHistoryFetcher.deferSeq(config.arg(Ids))
       )

@@ -23,11 +23,23 @@ class AppDAO(db: Database) {
     ccEncounters.filter(_.id inSet id).result
   )
 
+  def getCCEncounterBySubjective(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
+    db.run {
+      ccEncounters.filter(_.subjectiveId inSet ids).result
+    }
+  }
+
   def getPatientMedicalHistoryList: Future[Seq[PatientMedicalHistory]] = db.run(patientMedicalHistory.result)
 
   def getPatientMedicalHistory(id: Seq[Int]): Future[Seq[PatientMedicalHistory]] = db.run(
     patientMedicalHistory.filter(_.id inSet id).result
   )
+
+  def getPatientMedicalHistoryBySubjective(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
+    db.run {
+      patientMedicalHistory.filter(_.subjectiveId inSet ids).result
+    }
+  }
 
   def getSubjectiveList: Future[Seq[Subjective]] = db.run(subjective.result)
 
