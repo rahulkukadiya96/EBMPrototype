@@ -20,3 +20,5 @@ lazy val root = (project in file("."))
 
       libraryDependencies += scalaTest % Test
   )
+
+Revolver.settings
