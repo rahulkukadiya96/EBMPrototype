@@ -1,18 +1,63 @@
 package schema
 
 import config.MyContext
-import models.Patient
+import models.{LocalDateTimeCoerceViolation, Patient}
+import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, HasId}
 import sangria.schema.{Field, ListType, ObjectType}
 import sangria.schema._
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.ofPattern
+
 object GraphQLSchema {
+  object DateTimeFormatUtil {
+    def fromStrToDate(format: DateTimeFormatter, date: String): Option[LocalDateTime] = {
+      try {
+        Some(LocalDateTime.parse(date, format))
+      }
+      catch {
+        case _: Exception => None
+      }
+    }
+
+    def fromDateToStr(format: DateTimeFormatter, date: LocalDateTime): Option[String] = {
+      try {
+        Some(format.format(date))
+      }
+      catch {
+        case _: Exception => None
+      }
+    }
+  }
+
+  /**
+   * conversions between custom data type (LocalDateTime) and type Sangria understand and then back again to custom type.
+   */
+  implicit val GraphQLDateTime: ScalarType[LocalDateTime] = ScalarType[LocalDateTime](
+    "LocalDateTime", // Define the name
+    coerceOutput = (localDateTime, _) => (DateTimeFormatUtil fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime)).toRight(LocalDateTimeCoerceViolation),
+    coerceInput = {
+      case StringValue(dt, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd HH:mm"), dt)).toRight(LocalDateTimeCoerceViolation)
+    },
+    coerceUserInput = {
+      case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd HH:mm"), s)).toRight(LocalDateTimeCoerceViolation)
+      case _ => Left(LocalDateTimeCoerceViolation)
+    }
+  )
+
+  /*val patientType = deriveObjectType[Unit, Patient](
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
+  )*/
+
   private val patientType = ObjectType[Unit, Patient](
     "PATIENT",
     fields[Unit, Patient](
       Field("id", IntType, resolve = _.value.id),
       Field("name", StringType, resolve = _.value.name),
-      Field("age", IntType, resolve = _.value.age)
+      Field("age", IntType, resolve = _.value.age),
+      Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)
     )
   )
   private val Id = Argument("id", IntType)
