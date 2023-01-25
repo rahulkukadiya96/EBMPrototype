@@ -44,9 +44,9 @@ object DBSchema {
   private val databaseSetup = DBIO.seq(
     patientList.schema.create,
     patientList forceInsertAll Seq(
-      Patient(1, "David", 28, LocalDateTime of(2010, 20, 8, 12, 52)),
-      Patient(2, "Rahul", 25, LocalDateTime of(2020, 29, 9, 5, 36)),
-      Patient(3, "Terrace", 78, LocalDateTime of(2016, 21, 12, 1, 27))
+      Patient(1, "David", 28, LocalDateTime of(2010, 8, 8, 8, 52)),
+      Patient(2, "Rahul", 25, LocalDateTime of(2020, 8, 9, 5, 36)),
+      Patient(3, "Terrace", 78, LocalDateTime of(2016, 8, 8, 1, 27))
     )
   )
 
