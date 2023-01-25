@@ -2,6 +2,7 @@ package schema
 
 import config.MyContext
 import models.Patient
+import sangria.execution.deferred.{DeferredResolver, Fetcher, HasId}
 import sangria.schema.{Field, ListType, ObjectType}
 import sangria.schema._
 
@@ -14,8 +15,16 @@ object GraphQLSchema {
       Field("age", IntType, resolve = _.value.age)
     )
   )
-  private val ID_ARG_TYPE = Argument("id", IntType)
-  private val ID_LIST_ARG_TYPE = Argument("ids", ListInputType(IntType))
+  private val Id = Argument("id", IntType)
+  private val Ids = Argument("ids", ListInputType(IntType))
+
+
+  implicit val patientHasId: HasId[Patient, Int] = HasId[Patient, Int](_.id)
+  private val patientListFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPatients(ids)
+  )
+
+  val resolver: DeferredResolver[MyContext] = DeferredResolver.fetchers(patientListFetcher)
 
   private val queryType = ObjectType(
     "Query",
@@ -29,15 +38,16 @@ object GraphQLSchema {
       Field(
         "patient",
         OptionType(patientType),
-        arguments = ID_ARG_TYPE :: Nil,
-        resolve = config => config.ctx.dao.getPatient(config.arg(ID_ARG_TYPE))
+        arguments = Id :: Nil,
+        //resolve = config => config.ctx.dao.getPatient(config.arg(Id))
+        resolve = config => patientListFetcher.deferOpt(config.arg(Id))
       ),
 
       Field(
         "patients",
         OptionType(ListType(patientType)),
-        arguments = List(ID_LIST_ARG_TYPE),
-        resolve = config => config.ctx.dao.getPatients(config.arg(ID_LIST_ARG_TYPE))
+        arguments = List(Ids),
+        resolve = config => patientListFetcher.deferSeq(config.arg(Ids))
       )
     )
   )
