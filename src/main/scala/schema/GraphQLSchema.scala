@@ -37,12 +37,12 @@ object GraphQLSchema {
    */
   implicit val GraphQLDateTime: ScalarType[LocalDateTime] = ScalarType[LocalDateTime](
     "LocalDateTime", // Define the name
-    coerceOutput = (localDateTime, _) => (DateTimeFormatUtil fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime)).toRight(LocalDateTimeCoerceViolation),
+    coerceOutput = (localDateTime, _) => DateTimeFormatUtil.fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime).getOrElse(LocalDateTimeCoerceViolation.errorMessage),
     coerceInput = {
-      case StringValue(dt, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd HH:mm"), dt)).toRight(LocalDateTimeCoerceViolation)
+      case StringValue(dt, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
     },
     coerceUserInput = {
-      case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd HH:mm"), s)).toRight(LocalDateTimeCoerceViolation)
+      case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), s)).toRight(LocalDateTimeCoerceViolation)
       case _ => Left(LocalDateTimeCoerceViolation)
     }
   )
