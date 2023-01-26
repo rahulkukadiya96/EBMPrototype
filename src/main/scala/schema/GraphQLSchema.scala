@@ -53,7 +53,7 @@ object GraphQLSchema {
   /**
    * For the CC Encounter type
    */
-  lazy private val CCEncounterType = deriveObjectType[Unit, CCEncounter](
+  lazy private val CCEncounterType: ObjectType[Unit, CCEncounter] = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
     ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
@@ -69,7 +69,7 @@ object GraphQLSchema {
   /**
    * For the PatientMedicalHistoryTable type
    */
-  private lazy val PatientMedicalHistoryType = deriveObjectType[Unit, PatientMedicalHistory](
+  private lazy val PatientMedicalHistoryType: ObjectType[Unit, PatientMedicalHistory] = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
     ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
@@ -85,7 +85,7 @@ object GraphQLSchema {
   /**
    * For the CC SubjectiveTable type
    */
-  lazy val SubjectiveType: ObjectType[Unit, Subjective] = deriveObjectType[Unit, Subjective](
+  private lazy val SubjectiveType: ObjectType[Unit, Subjective] = deriveObjectType[Unit, Subjective](
     Interfaces(IdentifiableType),
     AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
     AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
