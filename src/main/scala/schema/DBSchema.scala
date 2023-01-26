@@ -35,9 +35,15 @@ object DBSchema {
 
     def age = column[Int]("age")
 
+    def address = column[String]("address")
+
+    def email = column[String]("email")
+
+    def password = column[String]("password")
+
     def createdDate = column[LocalDateTime]("CREATED_AT")
 
-    def * = (id, name, age, createdDate).mapTo[Patient]
+    def * = (id, name, age, address, email, password, createdDate).mapTo[Patient]
   }
 
   class CCEncounterTable(tag: Tag) extends Table[CCEncounter](tag, "CC_ENCOUNTER") {
@@ -102,9 +108,9 @@ object DBSchema {
     CCEncounters.schema.create,
     PatientMedicalHistoryQuery.schema.create,
     PatientList forceInsertAll Seq(
-      Patient(1, "David", 28, LocalDateTime of(2010, 8, 8, 8, 52)),
-      Patient(2, "Rahul", 25, LocalDateTime of(2020, 8, 9, 5, 36)),
-      Patient(3, "Terrace", 78, LocalDateTime of(2016, 8, 8, 1, 27))
+      Patient(1, "David", 28, "ON", "david96", "david96", LocalDateTime of(2010, 8, 8, 8, 52)),
+      Patient(2, "Rahul", 25, "BC", "rahul007", "rahul007", LocalDateTime of(2020, 8, 9, 5, 36)),
+      Patient(3, "Terrace", 78, "MB", "terrace963", "terrace963", LocalDateTime of(2016, 8, 8, 1, 27))
     ),
     SubjectiveQuery forceInsertAll Seq(
       Subjective(1),

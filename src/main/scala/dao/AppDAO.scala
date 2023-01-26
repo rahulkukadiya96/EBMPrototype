@@ -1,6 +1,6 @@
 package dao
 
-import models.{CCEncounter, Patient, PatientMedicalHistory, Subjective}
+import models.{AuthProviderSignupData, CCEncounter, Patient, PatientMedicalHistory, Subjective}
 import schema.DBSchema.{CCEncounters, PatientList, PatientMedicalHistoryQuery, SubjectiveQuery}
 import slick.jdbc.H2Profile.api._
 
@@ -9,6 +9,18 @@ import scala.concurrent.Future
 class AppDAO(db: Database) {
   def patientLst: Future[Seq[Patient]] = db.run(PatientList.result)
 
+  def createPatient(name: String, age: Int, address: String, authProvider: AuthProviderSignupData): Future[Patient] = {
+    val newUser = Patient(0, name, age, address, authProvider.email.email, authProvider.email.password)
+    val insertAndReturnUserQuery = (PatientList returning PatientList.map(_.id)) into {
+      (user, id) => user.copy(id = id)
+    }
+
+    println(s"New User ::: $newUser")
+
+    db.run(
+      insertAndReturnUserQuery += newUser
+    )
+  }
   /*def getPatient(id: Int): Future[Option[Patient]] = db.run(
     patientList.filter(_.id === id).result.headOption
   )*/

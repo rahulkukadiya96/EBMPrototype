@@ -4,8 +4,11 @@ import config.MyContext
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
-import sangria.macros.derive.{AddFields, Interfaces, ReplaceField, deriveObjectType}
+import sangria.macros.derive.{AddFields, InputObjectTypeName, Interfaces, ReplaceField, deriveInputObjectType, deriveObjectType}
 import sangria.schema._
+import sangria.marshalling.sprayJson._
+import spray.json.DefaultJsonProtocol._
+import spray.json.RootJsonFormat
 import utility.DateTimeFormatUtil
 
 import java.time.LocalDateTime
@@ -32,6 +35,10 @@ object GraphQLSchema {
       case _ => Left(LocalDateTimeCoerceViolation)
     }
   )
+
+  /**
+   * Query definition start
+   */
 
   private val IdentifiableType = InterfaceType(
     "Identifiable",
@@ -96,7 +103,6 @@ object GraphQLSchema {
   private val subjectiveFetcher = Fetcher(
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubject(ids)
   )
-
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
       patientListFetcher,
@@ -149,5 +155,45 @@ object GraphQLSchema {
     )
   )
 
-  val schemaDefinition: Schema[MyContext, Unit] = Schema(queryType)
+  /**
+   * Query definition end
+   */
+
+  /**
+   * Mutation definition start
+   */
+
+  implicit val AuthProviderEmailInputType: InputObjectType[AuthProviderEmail] = deriveInputObjectType[AuthProviderEmail](
+    InputObjectTypeName("AUTH_PROVIDER_EMAIL")
+  )
+
+  private lazy val AuthProviderSignupDataInputType: InputObjectType[AuthProviderSignupData] = deriveInputObjectType[AuthProviderSignupData]()
+
+  private val NameArg = Argument("name", StringType)
+  private val AddressArg = Argument("address", StringType)
+  private val AgeType = Argument("age", IntType)
+
+  /**
+   * Provide FromInput for input classes :: To convert from json to case classes
+   */
+  implicit val authProviderEmailFormat: RootJsonFormat[AuthProviderEmail] = jsonFormat2(AuthProviderEmail)
+  implicit val authProviderSignupDataFormat: RootJsonFormat[AuthProviderSignupData] = jsonFormat1(AuthProviderSignupData)
+
+  private val AuthProviderArg = Argument("authProvider", AuthProviderSignupDataInputType)
+
+  private val Mutation = ObjectType(
+    "Mutation",
+    fields[MyContext, Unit](
+      Field("createPatient",
+        patientType,
+        arguments = NameArg :: AgeType :: AddressArg :: AuthProviderArg :: Nil,
+        resolve = c => c.ctx.dao.createPatient(c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg), c.arg(AuthProviderArg))
+      )
+    )
+  )
+  /**
+   * Mutation definition end
+   */
+
+  val schemaDefinition: Schema[MyContext, Unit] = Schema(queryType, Some(Mutation))
 }
