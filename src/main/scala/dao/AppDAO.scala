@@ -55,7 +55,8 @@ class AppDAO(db: Database) {
 
   def getSubjectiveList: Future[Seq[Subjective]] = db.run(SubjectiveQuery.result)
 
-  def getSubject(id: Seq[Int]): Future[Seq[Subjective]] = db.run(
-    SubjectiveQuery.filter(_.id inSet id).result
-  )
+  def getSubject(id: Seq[Int]): Future[Seq[Subjective]] = db run (SubjectiveQuery filter (_.id inSet id)).result
+
+  def authenticate(email: String, password: String): Future[Option[Patient]] =
+    db run (PatientList filter (patient => patient.email === email && patient.password === password)).result.headOption
 }

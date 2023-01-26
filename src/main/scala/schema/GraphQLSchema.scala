@@ -172,6 +172,8 @@ object GraphQLSchema {
   private val NameArg = Argument("name", StringType)
   private val AddressArg = Argument("address", StringType)
   private val AgeType = Argument("age", IntType)
+  private val EmailType = Argument("email", StringType)
+  private val PasswordType = Argument("password", StringType)
 
   /**
    * Provide FromInput for input classes :: To convert from json to case classes
@@ -187,7 +189,16 @@ object GraphQLSchema {
       Field("createPatient",
         patientType,
         arguments = NameArg :: AgeType :: AddressArg :: AuthProviderArg :: Nil,
+        tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.createPatient(c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg), c.arg(AuthProviderArg))
+      ),
+      Field("Login",
+        patientType,
+        arguments = EmailType :: PasswordType :: Nil,
+        resolve = ctx => UpdateCtx(
+          ctx.ctx.login(ctx.arg(EmailType), ctx.arg(PasswordType))) { patient =>
+          ctx.ctx.copy(currentUser = Some(patient))
+        }
       )
     )
   )
