@@ -1,6 +1,7 @@
 package models
 
-import java.time.LocalDateTime
-import java.time.LocalDateTime.now
+import utility.DateTimeFormatUtil.getCurrentUTCTime
 
-case class PatientMedicalHistory(id : Int, subjectiveId: Int, medications: String, allergies: String, procedure: String, familyHistory: String, demographics: String, createdAt: LocalDateTime = now()) extends Identifiable
+import java.time.LocalDateTime
+
+case class PatientMedicalHistory(id : Int, subjectiveId: Int, medications: String, allergies: String, procedure: String, familyHistory: String, demographics: String, createdAt: LocalDateTime = getCurrentUTCTime) extends Identifiable

@@ -1,6 +1,7 @@
 package utility
 
-import java.time.LocalDateTime
+import java.time.ZoneOffset.UTC
+import java.time.{LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
 
 object DateTimeFormatUtil {
@@ -21,4 +22,6 @@ object DateTimeFormatUtil {
       case _: Exception => None
     }
   }
+
+  def getCurrentUTCTime: LocalDateTime = LocalDateTime now UTC
 }
