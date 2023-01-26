@@ -53,10 +53,10 @@ object GraphQLSchema {
   /**
    * For the CC Encounter type
    */
-  private val CCEncounterType = deriveObjectType[Unit, CCEncounter](
+  lazy private val CCEncounterType = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
-    // ReplaceField("subjectiveId", Field("subjective", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
+    ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
   // implicit val ccEncounterHasId: HasId[CCEncounter, Int] = HasId[CCEncounter, Int](_.id)
@@ -69,10 +69,10 @@ object GraphQLSchema {
   /**
    * For the PatientMedicalHistoryTable type
    */
-  private val PatientMedicalHistoryType = deriveObjectType[Unit, PatientMedicalHistory](
+  private lazy val PatientMedicalHistoryType = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
-     // ReplaceField("subjectiveId", Field("subjective", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
+    ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
   // implicit val patientMedicalHistoryHasId: HasId[PatientMedicalHistory, Int] = HasId[PatientMedicalHistory, Int](_.id)
@@ -85,7 +85,7 @@ object GraphQLSchema {
   /**
    * For the CC SubjectiveTable type
    */
-  lazy private val SubjectiveType = deriveObjectType[Unit, Subjective](
+  lazy val SubjectiveType: ObjectType[Unit, Subjective] = deriveObjectType[Unit, Subjective](
     Interfaces(IdentifiableType),
     AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
     AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),

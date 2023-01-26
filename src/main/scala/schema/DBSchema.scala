@@ -53,7 +53,7 @@ object DBSchema {
 
     def * = (id, subjectiveId, signs, symptoms, createdDate).mapTo[CCEncounter]
 
-    def subjectiveIdFK = foreignKey("FK_CC_ENCOUNTER_SUBJECTIVE", subjectiveId, subjective)(_.id)
+    def subjectiveIdFK = foreignKey("FK_CC_ENCOUNTER_SUBJECTIVE", subjectiveId, SubjectiveQuery)(_.id)
   }
 
   class PatientMedicalHistoryTable(tag: Tag) extends Table[PatientMedicalHistory](tag, "PMH") {
@@ -75,7 +75,7 @@ object DBSchema {
 
     override def * : ProvenShape[PatientMedicalHistory] = (id, subjectiveId, medications, allergies, procedure, familyHistory, demographics, createdDate).mapTo[PatientMedicalHistory]
 
-    def subjectiveIdFK = foreignKey("FK_PMH_SUBJECTIVE", subjectiveId, subjective)(_.id)
+    def subjectiveIdFK = foreignKey("FK_PMH_SUBJECTIVE", subjectiveId, SubjectiveQuery)(_.id)
   }
 
   class SubjectiveTable(tag: Tag) extends Table[Subjective](tag, "SUBJECTIVE") {
@@ -90,31 +90,31 @@ object DBSchema {
     def * = (id, createdDate).mapTo[Subjective]
   }
 
-  val patientList = TableQuery[PatientTable]
-  val ccEncounters = TableQuery[CCEncounterTable]
-  val patientMedicalHistory = TableQuery[PatientMedicalHistoryTable]
-  val subjective = TableQuery[SubjectiveTable]
+  val PatientList = TableQuery[PatientTable]
+  val CCEncounters = TableQuery[CCEncounterTable]
+  val PatientMedicalHistoryQuery = TableQuery[PatientMedicalHistoryTable]
+  val SubjectiveQuery = TableQuery[SubjectiveTable]
 
 
   private val databaseSetup = DBIO.seq(
-    patientList.schema.create,
-    patientList forceInsertAll Seq(
+    PatientList.schema.create,
+    SubjectiveQuery.schema.create,
+    CCEncounters.schema.create,
+    PatientMedicalHistoryQuery.schema.create,
+    PatientList forceInsertAll Seq(
       Patient(1, "David", 28, LocalDateTime of(2010, 8, 8, 8, 52)),
       Patient(2, "Rahul", 25, LocalDateTime of(2020, 8, 9, 5, 36)),
       Patient(3, "Terrace", 78, LocalDateTime of(2016, 8, 8, 1, 27))
     ),
-    subjective.schema.create,
-    subjective forceInsertAll Seq(
+    SubjectiveQuery forceInsertAll Seq(
       Subjective(1),
       Subjective(2),
     ),
-    ccEncounters.schema.create,
-    ccEncounters forceInsertAll Seq(
+    CCEncounters forceInsertAll Seq(
       CCEncounter(1, 1, "Abdominal Pain", "Stomach Infection"),
       CCEncounter(2, 2, "Coughing", "Viral Infection"),
     ),
-    patientMedicalHistory.schema.create,
-    patientMedicalHistory forceInsertAll Seq(
+    PatientMedicalHistoryQuery forceInsertAll Seq(
       PatientMedicalHistory(1, 1, "Paracetamol", "Skin", "Medication", " No family history", "Asian"),
       PatientMedicalHistory(2, 2, "Bitadin", "Skin", "Medication", " No family history", "Asian"),
     ),
