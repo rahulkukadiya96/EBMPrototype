@@ -1,138 +1,64 @@
 package schema
 
+import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.scalalogging.StrictLogging
 import dao.AppDAO
-import models.{CCEncounter, Patient, PatientMedicalHistory, Subjective}
-import slick.ast.BaseTypedType
-import slick.jdbc.H2Profile.api._
-import slick.jdbc.JdbcType
-import slick.lifted.ProvenShape
+import monix.eval.Task
+import monix.execution.Scheduler
+import org.neo4j.driver.v1.{AuthTokens, Driver, GraphDatabase}
 
-import java.sql.Timestamp
-import java.sql.Timestamp.valueOf
-import java.time.LocalDateTime
-import java.time.ZoneId.systemDefault
 import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 
 /**
  * file defines what we want to expose.
  * There are defined types (from GraphQL point of view) and shape of the schema a client is able to query for.
  */
-object DBSchema {
-  /**
-   * This custom mapper will convert LocalDateTime into Long, which is a primitive recognized by H2.
-   */
-  implicit val localDateTimeColumnType: JdbcType[LocalDateTime] with BaseTypedType[LocalDateTime] = MappedColumnType.base[LocalDateTime, Timestamp](
-    valueOf,
-    _.toInstant atZone systemDefault toLocalDateTime
-  )
-
-  class PatientTable(tag: Tag) extends Table[Patient](tag, "PATIENT") {
-    def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
-
-    def name = column[String]("name")
-
-    def age = column[Int]("age")
-
-    def address = column[String]("address")
-
-    def email = column[String]("email")
-
-    def password = column[String]("password")
-
-    def createdDate = column[LocalDateTime]("CREATED_AT")
-
-    def * = (id, name, age, address, email, password, createdDate).mapTo[Patient]
-  }
-
-  class CCEncounterTable(tag: Tag) extends Table[CCEncounter](tag, "CC_ENCOUNTER") {
-    def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
-
-    def signs = column[String]("SIGNS")
-
-    def symptoms = column[String]("SYMPTOMS")
-
-    def createdDate = column[LocalDateTime]("CREATED_AT")
-
-    def subjectiveId = column[Int]("SUBJECTIVE_ID")
-
-    def * = (id, subjectiveId, signs, symptoms, createdDate).mapTo[CCEncounter]
-
-    def subjectiveIdFK = foreignKey("FK_CC_ENCOUNTER_SUBJECTIVE", subjectiveId, SubjectiveQuery)(_.id)
-  }
-
-  class PatientMedicalHistoryTable(tag: Tag) extends Table[PatientMedicalHistory](tag, "PMH") {
-    def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
-
-    def medications = column[String]("MEDICATIONS")
-
-    def allergies = column[String]("ALLERGIES")
-
-    def procedure = column[String]("PROCEDURE")
-
-    def familyHistory = column[String]("FAMILY_HISTORY")
-
-    def demographics = column[String]("DEMOGRAPHIC")
-
-    def createdDate = column[LocalDateTime]("CREATED_AT")
-
-    def subjectiveId = column[Int]("SUBJECTIVE_ID")
-
-    override def * : ProvenShape[PatientMedicalHistory] = (id, subjectiveId, medications, allergies, procedure, familyHistory, demographics, createdDate).mapTo[PatientMedicalHistory]
-
-    def subjectiveIdFK = foreignKey("FK_PMH_SUBJECTIVE", subjectiveId, SubjectiveQuery)(_.id)
-  }
-
-  class SubjectiveTable(tag: Tag) extends Table[Subjective](tag, "SUBJECTIVE") {
-    def id = column[Int]("ID", O.PrimaryKey, O.AutoInc)
-
-    def pmhId = column[Int]("PMH_ID")
-
-    def ccEncId = column[Int]("CC_ENC_ID")
-
-    def createdDate = column[LocalDateTime]("CREATED_AT")
-
-    def * = (id, createdDate).mapTo[Subjective]
-  }
-
-  val PatientList = TableQuery[PatientTable]
-  val CCEncounters = TableQuery[CCEncounterTable]
-  val PatientMedicalHistoryQuery = TableQuery[PatientMedicalHistoryTable]
-  val SubjectiveQuery = TableQuery[SubjectiveTable]
-
-
-  private val databaseSetup = DBIO.seq(
-    PatientList.schema.create,
-    SubjectiveQuery.schema.create,
-    CCEncounters.schema.create,
-    PatientMedicalHistoryQuery.schema.create,
-    PatientList forceInsertAll Seq(
-      Patient(1, "David", 28, "ON", "david96", "david96", LocalDateTime of(2010, 8, 8, 8, 52)),
-      Patient(2, "Rahul", 25, "BC", "rahul007", "rahul007", LocalDateTime of(2020, 8, 9, 5, 36)),
-      Patient(3, "Terrace", 78, "MB", "terrace963", "terrace963", LocalDateTime of(2016, 8, 8, 1, 27))
-    ),
-    SubjectiveQuery forceInsertAll Seq(
-      Subjective(1),
-      Subjective(2),
-    ),
-    CCEncounters forceInsertAll Seq(
-      CCEncounter(1, 1, "Abdominal Pain", "Stomach Infection"),
-      CCEncounter(2, 2, "Coughing", "Viral Infection"),
-    ),
-    PatientMedicalHistoryQuery forceInsertAll Seq(
-      PatientMedicalHistory(1, 1, "Paracetamol", "Skin", "Medication", " No family history", "Asian"),
-      PatientMedicalHistory(2, 2, "Bitadin", "Skin", "Medication", " No family history", "Asian"),
-    ),
-  )
+object DBSchema extends StrictLogging {
+  val config: Config = ConfigFactory.load()
 
 
   def createDatabase: AppDAO = {
-    val db = Database.forConfig("h2mem")
+    initNeoDatabase
+  }
 
-    Await.result(db.run(databaseSetup), 10 seconds)
+  private def initNeoDatabase: AppDAO = {
+    implicit val scheduler: Scheduler = monix.execution.Scheduler.Implicits.global
+    val neo4jConnection = createNeo4jConnection()
+    new AppDAO(neo4jConnection)
+  }
 
-    new AppDAO(db)
+  /**
+   * The problem, that it takes ~15 seconds for Neo4j to initialize all internal services in a docker container.
+   * So, without the retry policy the test will fail due to missing connection with Neo4j instance.
+   */
+  private def createNeo4jConnection()(implicit s: Scheduler): Driver = {
+    logger.info(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
+    println(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
 
+    /*import scala.concurrent.duration._
+
+    def connectionAttempt() = Task {
+      GraphDatabase.driver(config.getString("neo4j.uri"), AuthTokens.basic(config.getString("neo4j.username"), config.getString("neo4j.password")))
+    }
+
+    val result = retry("Acquire Neo4j connection", connectionAttempt(), 5.seconds, 10.seconds, 10)
+
+    Await.result(result.runAsync, 55.seconds)*/
+    GraphDatabase.driver(config.getString("neo4j.uri"), AuthTokens.basic(config.getString("neo4j.username"), config.getString("neo4j.password")))
+  }
+
+  private def retry[T](name: String, originalTask: => Task[T], delay: FiniteDuration, timeout: FiniteDuration, retries: Int): Task[T] = {
+    val delayedTask = originalTask.delayExecution(delay).timeout(timeout)
+
+    def loop(task: Task[T], retries: Int): Task[T] = {
+      task.onErrorRecoverWith { case error if retries > 0 =>
+        logger.error(s"[$name] Retry policy. Current retires [$retries]. Delay [$delay]. Error [${error.getMessage}]")
+        loop(task, retries - 1)
+      }
+    }
+
+    loop(delayedTask, retries)
   }
 }

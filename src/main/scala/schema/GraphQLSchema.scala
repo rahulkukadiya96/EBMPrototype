@@ -117,7 +117,7 @@ object GraphQLSchema {
       Field(
         "patientList",
         ListType(patientType),
-        resolve = c => c.ctx.dao.patientLst
+        resolve = c => c.ctx.dao.patientList
       ),
 
       Field(
@@ -190,16 +190,16 @@ object GraphQLSchema {
         patientType,
         arguments = NameArg :: AgeType :: AddressArg :: AuthProviderArg :: Nil,
         tags = Authorized :: Nil,
-        resolve = c => c.ctx.dao.createPatient(c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg), c.arg(AuthProviderArg))
+        resolve = c => c.ctx.dao.createPatient(Patient(0, c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg)))
       ),
-      Field("Login",
+      /*Field("Login",
         patientType,
         arguments = EmailType :: PasswordType :: Nil,
         resolve = ctx => UpdateCtx(
           ctx.ctx.login(ctx.arg(EmailType), ctx.arg(PasswordType))) { patient =>
           ctx.ctx.copy(currentUser = Some(patient))
         }
-      )
+      )*/
     )
   )
   /**

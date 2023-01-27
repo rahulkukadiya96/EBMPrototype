@@ -63,7 +63,7 @@ object GraphQLServer {
       operationName = operation,
       deferredResolver = GraphQLSchema.resolver,
       exceptionHandler = ErrorHandler, // Custom exception handler
-      middleware = AuthMiddleware :: Nil // Add custom middleware to ensure authentication,
+      // middleware = AuthMiddleware :: Nil // Add custom middleware to ensure authentication,
     ).map(OK -> _)
       .recover {
         case error: QueryAnalysisError => BadRequest -> error.resolveError
