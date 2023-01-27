@@ -15,8 +15,6 @@ class AppDAO(db: Database) {
       (user, id) => user.copy(id = id)
     }
 
-    println(s"New User ::: $newUser")
-
     db.run(
       insertAndReturnUserQuery += newUser
     )
