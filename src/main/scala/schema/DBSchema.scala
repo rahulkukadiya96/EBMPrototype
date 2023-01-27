@@ -37,7 +37,7 @@ object DBSchema extends StrictLogging {
     logger.info(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
     println(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
 
-    /*import scala.concurrent.duration._
+    import scala.concurrent.duration._
 
     def connectionAttempt() = Task {
       GraphDatabase.driver(config.getString("neo4j.uri"), AuthTokens.basic(config.getString("neo4j.username"), config.getString("neo4j.password")))
@@ -45,8 +45,7 @@ object DBSchema extends StrictLogging {
 
     val result = retry("Acquire Neo4j connection", connectionAttempt(), 5.seconds, 10.seconds, 10)
 
-    Await.result(result.runAsync, 55.seconds)*/
-    GraphDatabase.driver(config.getString("neo4j.uri"), AuthTokens.basic(config.getString("neo4j.username"), config.getString("neo4j.password")))
+    Await.result(result.runAsync, 55.seconds)
   }
 
   private def retry[T](name: String, originalTask: => Task[T], delay: FiniteDuration, timeout: FiniteDuration, retries: Int): Task[T] = {
