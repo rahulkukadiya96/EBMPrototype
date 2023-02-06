@@ -35,7 +35,6 @@ object DBSchema extends StrictLogging {
    */
   private def createNeo4jConnection()(implicit s: Scheduler): Driver = {
     logger.info(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
-    println(s"Creating Neo4j connection with config ${config.getConfig("neo4j")}")
 
     import scala.concurrent.duration._
 

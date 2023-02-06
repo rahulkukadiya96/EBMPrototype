@@ -188,7 +188,7 @@ object GraphQLSchema {
     fields[MyContext, Unit](
       Field("createPatient",
         patientType,
-        arguments = NameArg :: AgeType :: AddressArg :: AuthProviderArg :: Nil,
+        arguments = NameArg :: AgeType :: AddressArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.createPatient(Patient(0, c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg)))
       ),
