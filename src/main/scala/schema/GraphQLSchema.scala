@@ -108,36 +108,21 @@ object GraphQLSchema {
     //  (ctx: MyContext, ids: RelationIds[PatientMedicalHistory]) => ctx.dao.getPatientMedicalHistoryBySubjective(ids(patientMedicalHistoryBySubjectiveRel))
   )
 
-  /**
-   * For the CC SubjectiveTable type
-   */
-  private lazy val SubjectiveType: ObjectType[Unit, Subjective] = deriveObjectType[Unit, Subjective](
-    Interfaces(IdentifiableType),
-    //    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
-    //    AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
-  )
-
   private lazy val SubjectiveNodeDataType: ObjectType[Unit, SubjectiveNodeData] = deriveObjectType[Unit, SubjectiveNodeData](
     Interfaces(IdentifiableType),
-//    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => Seq( c.value.patientMedicalHistory))),
-//    AddFields(Field("ccEnc", ListType(CCEncounterType), resolve = c => Seq( c.value.ccEnc))),
-    //    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
-    //    AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
-
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
   // implicit val subjectiveHasId: HasId[Subjective, Int] = HasId[Subjective, Int](_.id)
-  private val subjectiveFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubject(ids)
+  private val subjectiveDataFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubjectiveData(ids)
   )
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
       patientListFetcher,
       ccEncounterFetcher,
       patientMedicalHistoryFetcher,
-      subjectiveFetcher,
+      subjectiveDataFetcher,
     )
 
   private val queryType = ObjectType(
@@ -164,10 +149,15 @@ object GraphQLSchema {
         resolve = config => patientListFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
+        "subjectiveList",
+        OptionType(ListType(SubjectiveNodeDataType)),
+        resolve = c => c.ctx.dao.getSubjectiveList
+      ),
+      Field(
         "subjectives",
-        OptionType(ListType(SubjectiveType)),
+        OptionType(ListType(SubjectiveNodeDataType)),
         arguments = List(Ids),
-        resolve = config => subjectiveFetcher.deferSeq(config.arg(Ids))
+        resolve = config => subjectiveDataFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
         "ccEncounters",

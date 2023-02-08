@@ -70,14 +70,21 @@ class AppDAO(connection: Driver) {
 
   /* Subject Node methods */
 
-  def getSubjectiveList: Future[Seq[Subjective]] = {
-    val queryString = s"MATCH (n: Subjective) RETURN ID(n) as id, n.createdAt as createdAt"
-    getData(queryString, readSubjective)
+  def getSubjectiveList: Future[Seq[SubjectiveNodeData]] = {
+    var queryString = s"MATCH (subjective:Subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter) "
+    queryString += s" RETURN ID(subjective) as subjectiveId, subjective.createdAt as createdAt, "
+    queryString += s" ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt, "
+    queryString += s" ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+    getData(queryString, readSubjectiveNodeData)
   }
 
-  def getSubject(ids: Seq[Int]): Future[Seq[Subjective]] = {
-    val queryString = s"MATCH (n: Subjective) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as id, n.createdAt as createdAt"
-    getData(queryString, readSubjective)
+  def getSubjectiveData(ids: Seq[Int]): Future[Seq[SubjectiveNodeData]] = {
+    var queryString = s"MATCH (subjective:Subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter) "
+    queryString += s" WHERE ID(subjective) IN [${ids.mkString(",")}]"
+    queryString += " RETURN ID(subjective) as subjectiveId, subjective.createdAt as createdAt, "
+    queryString += " ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt, "
+    queryString += " ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+    getData(queryString, readSubjectiveNodeData)
   }
 
   /* CCEnc methods */
