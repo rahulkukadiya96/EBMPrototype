@@ -2,6 +2,7 @@ package dao
 
 import models._
 import org.neo4j.driver.v1.{Driver, Record}
+import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
 import scala.collection.JavaConverters._
@@ -9,6 +10,54 @@ import scala.compat.java8.FutureConverters
 import scala.concurrent.Future
 
 class AppDAO(connection: Driver) {
+  def createPatient(patient: Patient): Future[Patient] = {
+    val queryString = s"CREATE (patient : Patient{name : '${patient.name}', age : ${patient.age}, address : '${patient.address}', createAt : ${getTodayDateTimeNeo4j(patient.createdAt)} }) RETURN ID(patient) as id, patient.name as name, patient.age as age, patient.address as address, patient.createAt as createAt"
+    writeData(queryString, readPatient)
+  }
+
+
+  def createCCEnc(ccEnc: CCEncounter): Future[CCEncounter] = {
+    val queryString = s"CREATE (n : CCEncounter{signs : '${ccEnc.signs}', symptoms : '${ccEnc.symptoms}', createdAt : ${getTodayDateTimeNeo4j(ccEnc.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN ID(n) as ccEncId, n.signs as signs, n.symptoms as symptoms, n.createdAt as ccEncCreatedAt"
+    writeData(queryString, readCCEncounter)
+  }
+
+
+  def createSubject(subjective: SubjectiveNodeData): Future[Subjective] = {
+    val queryString = s"CREATE (subjective : Subjective{ createdAt : ${getTodayDateTimeNeo4j(subjective.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN ID(subjective) as id, subjective.createdAt as createdAt"
+    writeData(queryString, readSubjective)
+  }
+
+
+  def createPatientMedicalHistory(patientMedicalHistory: PatientMedicalHistory): Future[PatientMedicalHistory] = {
+    val queryString = s"CREATE (n : PatientMedicalHistory{medications : '${patientMedicalHistory.medications}', allergies : '${patientMedicalHistory.allergies}', procedure : '${patientMedicalHistory.procedure}', familyHistory : '${patientMedicalHistory.familyHistory}', demographics : '${patientMedicalHistory.demographics}',createdAt : ${getTodayDateTimeNeo4j(patientMedicalHistory.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory as familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
+    writeData(queryString, readPatientMedicalHistory)
+  }
+
+  def buildRelationForSubjectNode(patientId: Int, subId: Int, patMedId: Int, ccEncId: Int): Future[SubjectiveNodeData] = {
+    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = ${patientId} "
+    queryString += s"MATCH (subjective: Subjective) WHERE ID(subjective) = ${subId} "
+    queryString += s"MATCH (patientMedicalHistory: PatientMedicalHistory ) WHERE ID(patientMedicalHistory) = ${patMedId} "
+    queryString += s"MATCH (ccEnc: CCEncounter ) WHERE ID(ccEnc) = ${ccEncId} "
+
+
+    queryString += s" CREATE (patient)-[:soap_subject { subId : ${subId}  }]->(subjective), "
+    queryString += s" (subjective)-[:patient {patId : ${patientId} }]->(patient), "
+
+    queryString += s" (subjective)-[:pmh { patMedId : ${patMedId} }]->(patientMedicalHistory),"
+    queryString += s" (patientMedicalHistory)-[:subId { subId : ${subId} }]->(subjective), "
+
+    queryString += s" (subjective)-[:ccEnc { ccEnc : ${ccEncId} }]->(ccEnc), "
+    queryString += s" (ccEnc)-[:subId { subId : ${subId} }]->(subjective) "
+
+    queryString += s" RETURN ID(subjective) as subjectiveId, subjective.createdAt as createdAt, "
+    queryString += s" ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt, "
+    queryString += s" ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+
+    writeData(queryString, readSubjectiveNodeData)
+  }
+
+  /* Patient methods */
+
   def patientList: Future[Seq[Patient]] = {
     val queryString = "MATCH (n: Patient) RETURN ID(n) as id, n.name as name, n.age as age, n.address as address, n.createAt as createAt"
     getData(queryString, readPatient)
@@ -19,84 +68,7 @@ class AppDAO(connection: Driver) {
     getData(queryString, readPatient)
   }
 
-
-  def createPatient(patient: Patient): Future[Patient] = {
-    val queryString = s"CREATE (patient : Patient{name : '${patient.name}', age : ${patient.age}, address : '${patient.address}', createAt : ${getTodayDateTimeNeo4j(patient.createdAt)} }) RETURN ID(patient) as id, patient.name as name, patient.age as age, patient.address as address, patient.createAt as createAt"
-    writeData(queryString, readPatient)
-  }
-
-
-  def createCCEnc(ccEnc: CCEncounter): Future[CCEncounter] = {
-    val queryString = s"CREATE (n : CCEncounter{signs : '${ccEnc.signs}', symptoms : '${ccEnc.symptoms}', createdAt : ${getTodayDateTimeNeo4j(ccEnc.createdAt)} }) RETURN ID(n) as id, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
-    writeData(queryString, readCCEncounter)
-  }
-
-  def createSubjectNode(patientId: Int, ccEnc: CCEncounter, patientMedicalHistory: PatientMedicalHistory, subjective: Subjective): Future[Subjective] = {
-    var queryString = s"CREATE (ccEnc : CCEncounter{signs : '${ccEnc.signs}', symptoms : '${ccEnc.symptoms}', createdAt : ${getTodayDateTimeNeo4j(ccEnc.createdAt)} }) "
-    queryString += s", (patientMedicalHistory : PatientMedicalHistory{medications : '${patientMedicalHistory.medications}', allergies : '${patientMedicalHistory.allergies}', procedure : '${patientMedicalHistory.procedure}', familyHistory : '${patientMedicalHistory.familyHistory}', demographics : '${patientMedicalHistory.demographics}',createAt : ${getTodayDateTimeNeo4j(patientMedicalHistory.createdAt)} }) "
-    queryString += s", (subjective : Subjective{ createdAt : ${getTodayDateTimeNeo4j(subjective.createdAt)} }) "
-
-    queryString += "RETURN ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt "
-    queryString += ", ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory = familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt"
-    queryString += ", ID(subjective) as id, subjective.createdAt as createdAtSubjective"
-    writeData(queryString, readSubjective)
-  }
-
-  def buildRelationForSubjectNode(patientId: Int, subId: Int, patMedId: Int, ccEncId: Int): Future[Subjective] = {
-    var queryString = s"MATCH (patient: Patient {id: ${patientId} }, subjective: Subjective {id: ${subId} },patientMedicalHistory: PatientMedicalHistory {id: ${patMedId} },ccEnc: CCEncounter {id: ${ccEncId} }) "
-
-    queryString += s" create (patient)-[:soap_subject { subId : ${subId}]->(subjective) "
-    queryString += s" create (subjective)-[:patient {patId : ${patientId}]->(patient) "
-
-    queryString += s" create (subjective)-[:pmh { patMedId : ${patMedId}]->(patientMedicalHistory) "
-    queryString += s" create (patientMedicalHistory)-[:subId { subId : ${subId}]->(subjective) "
-
-    queryString += s" create (subjective)-[:ccEnc { ccEnc : ${ccEncId}]->(ccEnc) "
-    queryString += s" create (ccEnc)-[:subId { subId : ${subId}]->(subjective) "
-
-    writeData(queryString, readSubjective)
-  }
-
-  def getCCEncList: Future[Seq[CCEncounter]] = {
-    val queryString = s"MATCH (n: CCEncounter) RETURN ID(n) as id, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
-    getData(queryString, readCCEncounter)
-  }
-
-  def getCCEncounter(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
-    val queryString = s"MATCH (n: CCEncounter) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as id, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
-    getData(queryString, readCCEncounter)
-  }
-
-  def getCCEncounterBySubjective(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
-    //    val queryString = s"MATCH (n: CCEncounter) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as id, n.subjectiveId as subjectiveId, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
-    val queryString = s"MATCH (n: Subjective) <- [ : ]"
-    getData(queryString, readCCEncounter)
-  }
-
-  def getPatientMedicalHistory: Future[Seq[PatientMedicalHistory]] = {
-    val queryString = s"MATCH (n: PatientMedicalHistory) RETURN ID(n) as id, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as createdAt"
-    getData(queryString, readPatientMedicalHistory)
-  }
-
-  def getPatientMedicalHistory(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
-    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as id, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as createdAt"
-    getData(queryString, readPatientMedicalHistory)
-  }
-
-  def createPatientMedicalHistory(patientMedicalHistory: PatientMedicalHistory): Future[PatientMedicalHistory] = {
-    val queryString = s"CREATE (n : PatientMedicalHistory{medications : '${patientMedicalHistory.medications}', allergies : '${patientMedicalHistory.allergies}', procedure : '${patientMedicalHistory.procedure}', familyHistory : '${patientMedicalHistory.familyHistory}', demographics : '${patientMedicalHistory.demographics}',createAt : ${getTodayDateTimeNeo4j(patientMedicalHistory.createdAt)} }) RETURN ID(n) as id, n.subjectiveId as subjectiveId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as createdAt"
-    writeData(queryString, readPatientMedicalHistory)
-  }
-
-  def getPatientMedicalHistoryBySubjective(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
-    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as id, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as createdAt"
-    getData(queryString, readPatientMedicalHistory)
-  }
-
-  def createSubject(subjective: Subjective): Future[Subjective] = {
-    val queryString = s"CREATE (subjective : Subjective{ createdAt : ${getTodayDateTimeNeo4j(subjective.createdAt)} }) RETURN ID(subjective) as id, subjective.createdAt as createdAt"
-    writeData(queryString, readSubjective)
-  }
+  /* Subject Node methods */
 
   def getSubjectiveList: Future[Seq[Subjective]] = {
     val queryString = s"MATCH (n: Subjective) RETURN ID(n) as id, n.createdAt as createdAt"
@@ -106,6 +78,40 @@ class AppDAO(connection: Driver) {
   def getSubject(ids: Seq[Int]): Future[Seq[Subjective]] = {
     val queryString = s"MATCH (n: Subjective) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as id, n.createdAt as createdAt"
     getData(queryString, readSubjective)
+  }
+
+  /* CCEnc methods */
+
+  def getCCEncList: Future[Seq[CCEncounter]] = {
+    val queryString = s"MATCH (n: CCEncounter) RETURN ID(n) as ccEncId, n.signs as signs, n.symptoms as symptoms, n.createdAt as ccEncCreatedAt"
+    getData(queryString, readCCEncounter)
+  }
+
+  def getCCEncounter(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
+    val queryString = s"MATCH (n: CCEncounter) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as ccEncId, n.signs as signs, n.symptoms as symptoms, n.createdAt as ccEncCreatedAt"
+    getData(queryString, readCCEncounter)
+  }
+
+  def getCCEncounterBySubjective(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
+    //    val queryString = s"MATCH (n: CCEncounter) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as id, n.subjectiveId as subjectiveId, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
+    val queryString = s"MATCH (n: Subjective) <- [ : ]"
+    getData(queryString, readCCEncounter)
+  }
+
+  /* Patient Medical History methods */
+  def getPatientMedicalHistory(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
+    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
+    getData(queryString, readPatientMedicalHistory)
+  }
+
+  def getPatientMedicalHistory: Future[Seq[PatientMedicalHistory]] = {
+    val queryString = s"MATCH (n: PatientMedicalHistory) RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory as familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
+    getData(queryString, readPatientMedicalHistory)
+  }
+
+  def getPatientMedicalHistoryBySubjective(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
+    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory as familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
+    getData(queryString, readPatientMedicalHistory)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -154,31 +160,38 @@ class AppDAO(connection: Driver) {
 
   private def readCCEncounter(record: Record): CCEncounter = {
     CCEncounter(
-      id = record.get("id").asInt(),
-      //      subjectiveId = record.get("subjectiveId").asInt(),
+      id = record.get("ccEncId").asInt(),
       signs = record.get("signs").asString(),
       symptoms = record.get("symptoms").asString(),
-      createdAt = record.get("createdAt").asLocalDateTime()
+      createdAt = Some(record.get("ccEncCreatedAt").asLocalDateTime())
     )
   }
 
   private def readPatientMedicalHistory(record: Record): PatientMedicalHistory = {
     PatientMedicalHistory(
-      id = record.get("id").asInt(),
-      //      subjectiveId = record.get("subjectiveId").asInt(),
-      medications = record.get("signs").asString(),
-      allergies = record.get("symptoms").asString(),
+      id = record.get("patientMedicalHistoryId").asInt(),
+      medications = record.get("medications").asString(),
+      allergies = record.get("allergies").asString(),
       procedure = record.get("procedure").asString(),
       familyHistory = record.get("familyHistory").asString(),
       demographics = record.get("demographics").asString(),
-      createdAt = record.get("createdAt").asLocalDateTime()
+      createdAt = Some(record.get("patientMedicalHistoryCreatedAt").asLocalDateTime())
     )
   }
 
   private def readSubjective(record: Record): Subjective = {
     Subjective(
       id = record.get("id").asInt(),
-      createdAt = record.get("createdAt").asLocalDateTime()
+      createdAt = Some(record.get("createdAt").asLocalDateTime())
+    )
+  }
+
+  private def readSubjectiveNodeData(record: Record): SubjectiveNodeData = {
+    SubjectiveNodeData(
+      id = record.get("subjectiveId").asInt(),
+      createdAt = Some(record.get("createdAt").asLocalDateTime()),
+      patientMedicalHistory = readPatientMedicalHistory(record),
+      ccEnc = readCCEncounter(record)
     )
   }
 }

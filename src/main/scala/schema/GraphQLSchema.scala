@@ -43,14 +43,16 @@ object GraphQLSchema {
    */
   implicit object DateJsonFormat extends RootJsonFormat[LocalDateTime] {
 
-    private val defaultDateTimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MM/dd/YYYY");
+    private val defaultDateTimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
 
     override def write(obj: LocalDateTime) = JsString(defaultDateTimeFormat.format(obj))
+
     override def read(json: JsValue): LocalDateTime = json match {
       case JsString(s) => LocalDateTime.parse(s, defaultDateTimeFormat)
       case _ => throw DeserializationException("Invalid date format. It should be MM/dd/YYYY format")
     }
   }
+
   /**
    * Query definition start
    */
@@ -75,9 +77,9 @@ object GraphQLSchema {
   /**
    * For the CC Encounter type
    */
-  lazy private val CCEncounterType: ObjectType[Unit, CCEncounter] = deriveObjectType[Unit, CCEncounter](
+  implicit val CCEncounterType: ObjectType[Unit, CCEncounter] = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get)),
     //    ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
@@ -92,9 +94,9 @@ object GraphQLSchema {
   /**
    * For the PatientMedicalHistoryTable type
    */
-  private lazy val PatientMedicalHistoryType: ObjectType[Unit, PatientMedicalHistory] = deriveObjectType[Unit, PatientMedicalHistory](
+  implicit val PatientMedicalHistoryType: ObjectType[Unit, PatientMedicalHistory] = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt)),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get)),
     //    ReplaceField("subjectiveId", Field("subject", SubjectiveType, resolve = c => subjectiveFetcher.defer(c.value.subjectiveId)))
   )
 
@@ -113,7 +115,17 @@ object GraphQLSchema {
     Interfaces(IdentifiableType),
     //    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
     //    AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
-    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
+  )
+
+  private lazy val SubjectiveNodeDataType: ObjectType[Unit, SubjectiveNodeData] = deriveObjectType[Unit, SubjectiveNodeData](
+    Interfaces(IdentifiableType),
+//    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => Seq( c.value.patientMedicalHistory))),
+//    AddFields(Field("ccEnc", ListType(CCEncounterType), resolve = c => Seq( c.value.ccEnc))),
+    //    AddFields(Field("pmh", ListType(PatientMedicalHistoryType), resolve = c => patientMedicalHistoryFetcher.deferRelSeq(patientMedicalHistoryBySubjectiveRel, c.value.id))),
+    //    AddFields(Field("encounter", ListType(CCEncounterType), resolve = c => ccEncounterFetcher.deferRelSeq(ccEncounterFetcherBySubjectiveRel, c.value.id))),
+
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
   // implicit val subjectiveHasId: HasId[Subjective, Int] = HasId[Subjective, Int](_.id)
@@ -200,21 +212,21 @@ object GraphQLSchema {
 
   private val AuthProviderArg = Argument("authProvider", AuthProviderSignupDataInputType)
 
-  lazy val SubjectiveInputType: InputObjectType[Subjective] = deriveInputObjectType[Subjective](
-    InputObjectTypeName("SUBJECTIVE_INPUT TYPE")
+  private lazy val SubjectiveNodeDataInputType: InputObjectType[SubjectiveNodeData] = deriveInputObjectType[SubjectiveNodeData](
+    InputObjectTypeName("SUBJECTIVE_NODE_DATA_TYPE")
   )
-  lazy val CCEncInputType: InputObjectType[CCEncounter] = deriveInputObjectType[CCEncounter] (
-    InputObjectTypeName("CC_ENC_INPUT TYPE")
+  implicit val CCEncInputType: InputObjectType[CCEncounter] = deriveInputObjectType[CCEncounter](
+    InputObjectTypeName("CC_ENC_INPUT_TYPE")
   )
-  lazy val PatientMedicalHistoryInputType: InputObjectType[PatientMedicalHistory] = deriveInputObjectType[PatientMedicalHistory] (
-    InputObjectTypeName("PATIENT_MEDICAL_HISTORY_INPUT TYPE")
+  implicit val PatientMedicalHistoryInputType: InputObjectType[PatientMedicalHistory] = deriveInputObjectType[PatientMedicalHistory](
+    InputObjectTypeName("PATIENT_MEDICAL_HISTORY_INPUT_TYPE")
   )
 
-  implicit val subjectiveFormat: RootJsonFormat[Subjective] = jsonFormat2(Subjective)
   implicit val ccEncFormat: RootJsonFormat[CCEncounter] = jsonFormat4(CCEncounter)
   implicit val PatientMedicalHistoryFormat: RootJsonFormat[PatientMedicalHistory] = jsonFormat7(PatientMedicalHistory)
 
-  private val SubjectiveArg = Argument("subjective", SubjectiveInputType)
+  implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
+  private val SubjectiveNodeDataArg = Argument("subjectiveNodeData", SubjectiveNodeDataInputType)
   private val CCEncArg = Argument("ccEnc", CCEncInputType)
   private val PatientMedicalHistoryArg = Argument("patientMedicalHistory", PatientMedicalHistoryInputType)
   private val PatientIdArg = Argument("patientId", IntType)
@@ -230,17 +242,20 @@ object GraphQLSchema {
       ),
 
       Field("createSubject",
-        SubjectiveType,
-        arguments = PatientIdArg :: SubjectiveArg :: CCEncArg :: PatientMedicalHistoryArg :: Nil,
+        SubjectiveNodeDataType,
+        arguments = PatientIdArg :: SubjectiveNodeDataArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => {
           val dao = c.ctx.dao
+          val subjectiveNodeData: SubjectiveNodeData = c.arg(SubjectiveNodeDataArg)
+          val patientId: Int = c.arg(PatientIdArg)
           for {
-            ccEncData <- dao.createCCEnc(c.arg(CCEncArg))
-            patientMedicalHistoryData <- dao.createPatientMedicalHistory(c.arg(PatientMedicalHistoryArg))
-            subjectiveData <- dao.createSubject(c.arg(SubjectiveArg))
-            subjectiveNode <- dao.buildRelationForSubjectNode(c.arg(PatientIdArg), subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
-          } yield subjectiveNode
+            /*patient <- dao.getPatients(Seq(patientId))*/
+            ccEncData <- dao.createCCEnc(subjectiveNodeData.ccEnc)
+            patientMedicalHistoryData <- dao.createPatientMedicalHistory(subjectiveNodeData.patientMedicalHistory)
+            subjectiveData <- dao.createSubject(subjectiveNodeData)
+            subjectiveNodeData <- dao.buildRelationForSubjectNode(c.arg(PatientIdArg), subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
+          } yield subjectiveNodeData
         }
       ),
 
