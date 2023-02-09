@@ -90,7 +90,7 @@ class AppDAO(connection: Driver) {
   /* CCEnc methods */
 
   def getCCEncList: Future[Seq[CCEncounter]] = {
-    val queryString = s"MATCH (n: CCEncounter) RETURN ID(n) as ccEncId, n.signs as signs, n.symptoms as symptoms, n.createdAt as ccEncCreatedAt"
+    val queryString = s"MATCH (ccEncounter: CCEncounter)  RETURN ID(ccEncounter) as ccEncId, ccEncounter.signs as signs, ccEncounter.symptoms as symptoms, ccEncounter.createdAt as ccEncCreatedAt"
     getData(queryString, readCCEncounter)
   }
 
@@ -107,7 +107,7 @@ class AppDAO(connection: Driver) {
 
   /* Patient Medical History methods */
   def getPatientMedicalHistory(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
-    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory = familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
+    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE ID(n) IN [${ids.mkString(",")}] RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory as familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
     getData(queryString, readPatientMedicalHistory)
   }
 

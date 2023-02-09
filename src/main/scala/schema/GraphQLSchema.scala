@@ -160,10 +160,20 @@ object GraphQLSchema {
         resolve = config => subjectiveDataFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
+        "ccEncounterList",
+        OptionType(ListType(CCEncounterType)),
+        resolve = config => config.ctx.dao.getCCEncList
+      ),
+      Field(
         "ccEncounters",
         OptionType(ListType(CCEncounterType)),
         arguments = List(Ids),
         resolve = config => ccEncounterFetcher.deferSeq(config.arg(Ids))
+      ),
+      Field(
+        "patientMedicalHistoryList",
+        OptionType(ListType(PatientMedicalHistoryType)),
+        resolve = config => config.ctx.dao.getPatientMedicalHistory
       ),
       Field(
         "patientMedicalHistories",
