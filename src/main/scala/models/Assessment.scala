@@ -1,3 +1,5 @@
 package models
 
-case class Assessment(ddx: String, mechanism: String)
+import java.time.LocalDateTime
+
+case class Assessment(id: Int, ddx: String, mechanism: String, createdAt: Option[LocalDateTime]) extends Identifiable

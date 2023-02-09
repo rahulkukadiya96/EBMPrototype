@@ -70,6 +70,32 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readObjective)
   }
 
+  private val returnAssessmentGenQuery = s" RETURN ID(assessment) as assessmentId, assessment.ddx as ddx, assessment.mechanism as mechanism, assessment.createdAt as assessmentCreatedAt"
+
+  def createAssessment(patientId: Int, assessment: Assessment): Future[Assessment] = {
+    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = $patientId "
+    queryString = s"CREATE (assessment : Assessment{ ddx: '${assessment.ddx}', mechanism: '${assessment.mechanism}', createdAt : ${getTodayDateTimeNeo4j(assessment.createdAt.getOrElse(getCurrentUTCTime))} }) "
+
+    queryString += s" CREATE (patient)-[:soap_assessment { subId :ID(assessment)  }]->(assessment), "
+    queryString += s" (assessment)-[:patient {patId : $patientId }]->(patient) "
+
+    queryString += returnAssessmentGenQuery
+    writeData(queryString, readAssessment)
+  }
+
+  private val returnPlanGenQuery = s" RETURN ID(plan) as planId, plan.indication as indication, plan.management as management, plan.summary as summary, plan.followup as followup, plan.createdAt as planCreatedAt"
+
+  def createPlan(patientId: Int, plan: Plan): Future[Plan] = {
+    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = $patientId "
+    queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) "
+
+    queryString += s" CREATE (patient)-[:soap_plan { subId :ID(plan)  }]->(plan), "
+    queryString += s" (plan)-[:patient {patId : $patientId }]->(patient) "
+
+    queryString += returnPlanGenQuery
+    writeData(queryString, readPlan)
+  }
+
 
   /* Patient methods */
 
@@ -139,9 +165,31 @@ class AppDAO(connection: Driver) {
     val queryString = s"MATCH (objective:Objective) " + returnObjGenQuery
     getData(queryString, readObjective)
   }
+
   def getObjectiveData(ids: Seq[Int]): Future[Seq[Objective]] = {
     val queryString = s"MATCH (objective:Objective) WHERE ID(objective) IN [${ids.mkString(",")} ] " + returnObjGenQuery
     getData(queryString, readObjective)
+  }
+
+
+  def getAssessmentData: Future[Seq[Assessment]] = {
+    val queryString = s"MATCH (assessment:Assessment) " + returnAssessmentGenQuery
+    getData(queryString, readAssessment)
+  }
+
+  def getAssessmentData(ids: Seq[Int]): Future[Seq[Assessment]] = {
+    val queryString = s"MATCH (assessment:Assessment) WHERE ID(assessment) IN [${ids.mkString(",")} ] " + returnAssessmentGenQuery
+    getData(queryString, readAssessment)
+  }
+
+  def getPlanData: Future[Seq[Plan]] = {
+    val queryString = s"MATCH (plan:Plan) " + returnPlanGenQuery
+    getData(queryString, readPlan)
+  }
+
+  def getPlanData(ids: Seq[Int]): Future[Seq[Plan]] = {
+    val queryString = s"MATCH (plan:Plan) WHERE ID(plan) IN [${ids.mkString(",")} ] " + returnPlanGenQuery
+    getData(queryString, readPlan)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -235,6 +283,26 @@ class AppDAO(connection: Driver) {
       physicalExam = record.get("physicalExam").asString(),
       diagnosticData = record.get("diagnosticData").asString(),
       createdAt = Some(record.get("objectiveCreatedAt").asLocalDateTime())
+    )
+  }
+
+  private def readAssessment(record: Record): Assessment = {
+    Assessment(
+      id = record.get("assessmentId").asInt(),
+      ddx = record.get("ddx").asString(),
+      mechanism = record.get("mechanism").asString(),
+      createdAt = Some(record.get("assessmentCreatedAt").asLocalDateTime())
+    )
+  }
+
+  private def readPlan(record: Record): Plan = {
+    Plan(
+      id = record.get("planId").asInt(),
+      indication = record.get("indication").asString(),
+      management = record.get("management").asString(),
+      summary = record.get("summary").asString(),
+      followup = record.get("followup").asString(),
+      createdAt = Some(record.get("planCreatedAt").asLocalDateTime())
     )
   }
 }

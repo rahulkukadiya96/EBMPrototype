@@ -120,11 +120,29 @@ object GraphQLSchema {
   )
 
   private val objectiveDataFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getObjectiveData(ids)
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao getObjectiveData ids
+  )
+
+  private val assessmentDataFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getAssessmentData(ids)
+  )
+
+  private val planDataFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPlanData(ids)
   )
 
 
   private lazy val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
+    Interfaces(IdentifiableType),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
+  )
+
+  private lazy val AssessmentDataType: ObjectType[Unit, Assessment] = deriveObjectType[Unit, Assessment](
+    Interfaces(IdentifiableType),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
+  )
+
+  private lazy val PlanDataType: ObjectType[Unit, Plan] = deriveObjectType[Unit, Plan](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
@@ -137,7 +155,9 @@ object GraphQLSchema {
       patientMedicalHistoryFetcher,
       subjectiveDataEncFetcher,
       subjectiveDataPmhFetcher,
-      objectiveDataFetcher
+      objectiveDataFetcher,
+      assessmentDataFetcher,
+      planDataFetcher
     )
 
   private val queryType = ObjectType(
@@ -209,6 +229,30 @@ object GraphQLSchema {
         OptionType(ListType(ObjectiveDataType)),
         arguments = List(Ids),
         resolve = config => objectiveDataFetcher.deferSeq(config.arg(Ids))
+      ),
+
+      Field(
+        "assessmentList",
+        OptionType(ListType(AssessmentDataType)),
+        resolve = c => c.ctx.dao.getAssessmentData
+      ),
+      Field(
+        "assessments",
+        OptionType(ListType(AssessmentDataType)),
+        arguments = List(Ids),
+        resolve = config => assessmentDataFetcher.deferSeq(config.arg(Ids))
+      ),
+
+      Field(
+        "planList",
+        OptionType(ListType(PlanDataType)),
+        resolve = c => c.ctx.dao.getPlanData
+      ),
+      Field(
+        "plans",
+        OptionType(ListType(PlanDataType)),
+        arguments = List(Ids),
+        resolve = config => planDataFetcher.deferSeq(config.arg(Ids))
       )
     )
   )
@@ -250,14 +294,28 @@ object GraphQLSchema {
     InputObjectTypeName("OBJECT_INPUT_TYPE")
   )
 
+  implicit val AssessmentDataInputType: InputObjectType[Assessment] = deriveInputObjectType[Assessment](
+    InputObjectTypeName("ASSESSMENT_INPUT_TYPE")
+  )
+
+  implicit val PlanDataInputType: InputObjectType[Plan] = deriveInputObjectType[Plan](
+    InputObjectTypeName("PLAN_INPUT_TYPE")
+  )
+
 
   implicit val ccEncFormat: RootJsonFormat[CCEncounter] = jsonFormat4(CCEncounter)
   implicit val PatientMedicalHistoryFormat: RootJsonFormat[PatientMedicalHistory] = jsonFormat7(PatientMedicalHistory)
   implicit val ObjectiveFormat: RootJsonFormat[Objective] = jsonFormat6(Objective)
+  implicit val AssessmentFormat: RootJsonFormat[Assessment] = jsonFormat4(Assessment)
+  implicit val PlanFormat: RootJsonFormat[Plan] = jsonFormat6(Plan)
+
 
   implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
   private val SubjectiveNodeDataArg = Argument("subjectiveNodeData", SubjectiveNodeDataInputType)
   private val ObjectiveDataArg = Argument("objectNodeData", ObjectiveDataInputType)
+  private val AssessmentDataArg = Argument("assessmentNodeData", AssessmentDataInputType)
+  private val PlanDataArg = Argument("planNodeData", PlanDataInputType)
+
   private val PatientIdArg = Argument("patientId", IntType)
 
   private val Mutation = ObjectType(
@@ -292,6 +350,20 @@ object GraphQLSchema {
         arguments = PatientIdArg :: ObjectiveDataArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.createObject(c.arg(PatientIdArg), c.arg(ObjectiveDataArg))
+      ),
+
+      Field("createAssessment",
+        AssessmentDataType,
+        arguments = PatientIdArg :: AssessmentDataArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.dao.createAssessment(c.arg(PatientIdArg), c.arg(AssessmentDataArg))
+      ),
+
+      Field("createPlan",
+        PlanDataType,
+        arguments = PatientIdArg :: PlanDataArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.dao.createPlan(c.arg(PatientIdArg), c.arg(PlanDataArg))
       ),
 
       /*Field("Login",
