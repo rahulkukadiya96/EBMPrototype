@@ -3,7 +3,7 @@ package schema
 import config.MyContext
 import models._
 import sangria.ast.StringValue
-import sangria.execution.deferred.{DeferredResolver, Fetcher}
+import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
 import sangria.macros.derive._
 import sangria.marshalling.sprayJson._
 import sangria.schema._
@@ -76,10 +76,15 @@ object GraphQLSchema {
   /**
    * For the CC Encounter type
    */
+  private val subjectByCCEncRel = Relation[SubjectiveNodeData, Int]("byEnc", l => Seq(l.ccEnc.id))
+  private val subjectByPMHRel = Relation[SubjectiveNodeData, Int]("byPatientMedicalHistory", l => Seq(l.patientMedicalHistory.id))
+
   implicit val CCEncounterType: ObjectType[Unit, CCEncounter] = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
+    AddFields(Field("Subjective", ListType(SubjectiveNodeDataType), resolve = c => subjectiveDataEncFetcher.deferRelSeq(subjectByCCEncRel, c.value.id))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
+
   private val ccEncounterFetcher = Fetcher(
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getCCEncounter(ids)
   )
@@ -89,6 +94,7 @@ object GraphQLSchema {
    */
   implicit val PatientMedicalHistoryType: ObjectType[Unit, PatientMedicalHistory] = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
+    AddFields(Field("Subjective", ListType(SubjectiveNodeDataType), resolve = c => subjectiveDataPmhFetcher.deferRelSeq(subjectByPMHRel, c.value.id))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
@@ -101,15 +107,26 @@ object GraphQLSchema {
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
-  private val subjectiveDataFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubjectiveData(ids)
+  // Define the relation fetcher between subject and enc
+  private val subjectiveDataEncFetcher = Fetcher.rel(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubjectiveData(ids),
+    (ctx: MyContext, ids: RelationIds[SubjectiveNodeData]) => ctx.dao.getSubjectiveNodeDataByEncId(ids(subjectByCCEncRel)).flatMap(ctx.dao.getSubjectiveData)
   )
+
+  // Define the relation fetcher between subject and patient medical history
+  private val subjectiveDataPmhFetcher = Fetcher.rel(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSubjectiveData(ids),
+    (ctx: MyContext, ids: RelationIds[SubjectiveNodeData]) => ctx.dao.getSubjectiveNodeDataByPmhId(ids(subjectByPMHRel)).flatMap(ctx.dao.getSubjectiveData)
+  )
+
+
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
       patientListFetcher,
       ccEncounterFetcher,
       patientMedicalHistoryFetcher,
-      subjectiveDataFetcher,
+      subjectiveDataEncFetcher,
+      subjectiveDataPmhFetcher
     )
 
   private val queryType = ObjectType(
@@ -144,7 +161,7 @@ object GraphQLSchema {
         "subjectives",
         OptionType(ListType(SubjectiveNodeDataType)),
         arguments = List(Ids),
-        resolve = config => subjectiveDataFetcher.deferSeq(config.arg(Ids))
+        resolve = config => subjectiveDataEncFetcher.deferSeq(config.arg(Ids))
       ),
       Field(
         "ccEncounterList",
@@ -191,7 +208,6 @@ object GraphQLSchema {
     InputObjectTypeName("AUTH_PROVIDER_EMAIL")
   )
 
-  private lazy val AuthProviderSignupDataInputType: InputObjectType[AuthProviderSignupData] = deriveInputObjectType[AuthProviderSignupData]()
   implicit val authProviderEmailFormat: RootJsonFormat[AuthProviderEmail] = jsonFormat2(AuthProviderEmail)
   implicit val authProviderSignupDataFormat: RootJsonFormat[AuthProviderSignupData] = jsonFormat1(AuthProviderSignupData)
 

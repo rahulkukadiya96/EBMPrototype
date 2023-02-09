@@ -1,12 +1,14 @@
 package dao
 
 import models._
+import org.neo4j.driver.internal.cluster.ClusterCompositionResponse.Failure
 import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
 import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class AppDAO(connection: Driver) {
@@ -99,10 +101,9 @@ class AppDAO(connection: Driver) {
     getData(queryString, readCCEncounter)
   }
 
-  def getCCEncounterBySubjective(ids: Seq[Int]): Future[Seq[CCEncounter]] = {
-    //    val queryString = s"MATCH (n: CCEncounter) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as id, n.subjectiveId as subjectiveId, n.signs as signs, n.symptoms as symptoms, n.createdAt as createdAt"
-    val queryString = s"MATCH (n: Subjective) <- [ : ]"
-    getData(queryString, readCCEncounter)
+  def getSubjectiveNodeDataByEncId(ids: Seq[Int]): Future[Seq[Int]] = {
+    val queryString = s"MATCH (subjective :Subjective)-[r:ccEnc]->(ccEnc:CCEncounter) WHERE r.ccEnc = ${ids.mkString(",")} RETURN ID(subjective) as subjectiveId"
+    getData(queryString, readSubjectiveNodeId)
   }
 
   /* Patient Medical History methods */
@@ -116,9 +117,9 @@ class AppDAO(connection: Driver) {
     getData(queryString, readPatientMedicalHistory)
   }
 
-  def getPatientMedicalHistoryBySubjective(ids: Seq[Int]): Future[Seq[PatientMedicalHistory]] = {
-    val queryString = s"MATCH (n: PatientMedicalHistory) WHERE n.subjectiveId IN [${ids.mkString(",")}] RETURN ID(n) as patientMedicalHistoryId, n.medications as medications, n.allergies as allergies, n.procedure as procedure, n.familyHistory as familyHistory, n.demographics as demographics, n.createdAt as patientMedicalHistoryCreatedAt"
-    getData(queryString, readPatientMedicalHistory)
+  def getSubjectiveNodeDataByPmhId(ids: Seq[Int]): Future[Seq[Int]] = {
+    val queryString = s"MATCH (subjective :Subjective)-[r:pmh]->(:PatientMedicalHistory) WHERE r.patMedId = ${ids.mkString(",")} RETURN ID(subjective) as subjectiveId"
+    getData(queryString, readSubjectiveNodeId)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -201,4 +202,6 @@ class AppDAO(connection: Driver) {
       ccEnc = readCCEncounter(record)
     )
   }
+
+  private def readSubjectiveNodeId(record: Record): Int = record.get("subjectiveId").asInt()
 }
