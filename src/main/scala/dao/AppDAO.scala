@@ -1,14 +1,12 @@
 package dao
 
 import models._
-import org.neo4j.driver.internal.cluster.ClusterCompositionResponse.Failure
 import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
 import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class AppDAO(connection: Driver) {
@@ -57,6 +55,21 @@ class AppDAO(connection: Driver) {
 
     writeData(queryString, readSubjectiveNodeData)
   }
+
+
+  private val returnObjGenQuery = s" RETURN ID(objective) as objectiveId, objective.vital as vital, objective.labTest as labTest, objective.physicalExam as physicalExam, objective.diagnosticData as diagnosticData, objective.createdAt as objectiveCreatedAt"
+
+  def createObject(patientId: Int, objective: Objective): Future[Objective] = {
+    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = $patientId "
+    queryString = s"CREATE (objective : Objective{ vital: '${objective.vital}', labTest: '${objective.labTest}', physicalExam: '${objective.physicalExam}', diagnosticData: '${objective.diagnosticData}', createdAt : ${getTodayDateTimeNeo4j(objective.createdAt.getOrElse(getCurrentUTCTime))} }) "
+
+    queryString += s" CREATE (patient)-[:soap_object { subId :ID(objective)  }]->(objective), "
+    queryString += s" (objective)-[:patient {patId : $patientId }]->(patient) "
+
+    queryString += returnObjGenQuery
+    writeData(queryString, readOjective)
+  }
+
 
   /* Patient methods */
 
@@ -120,6 +133,15 @@ class AppDAO(connection: Driver) {
   def getSubjectiveNodeDataByPmhId(ids: Seq[Int]): Future[Seq[Int]] = {
     val queryString = s"MATCH (subjective :Subjective)-[r:pmh]->(:PatientMedicalHistory) WHERE r.patMedId = ${ids.mkString(",")} RETURN ID(subjective) as subjectiveId"
     getData(queryString, readSubjectiveNodeId)
+  }
+
+  def getObjectiveData: Future[Seq[Objective]] = {
+    val queryString = s"MATCH (objective:Objective) " + returnObjGenQuery
+    getData(queryString, readOjective)
+  }
+  def getObjectiveData(ids: Seq[Int]): Future[Seq[Objective]] = {
+    val queryString = s"MATCH (objective:Objective) WHERE ID(objective) IN [${ids.mkString(",")} ] " + returnObjGenQuery
+    getData(queryString, readOjective)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -204,4 +226,15 @@ class AppDAO(connection: Driver) {
   }
 
   private def readSubjectiveNodeId(record: Record): Int = record.get("subjectiveId").asInt()
+
+  private def readOjective(record: Record): Objective = {
+    Objective(
+      id = record.get("objectiveId").asInt(),
+      vital = record.get("vital").asString(),
+      labTest = record.get("labTest").asString(),
+      physicalExam = record.get("physicalExam").asString(),
+      diagnosticData = record.get("diagnosticData").asString(),
+      createdAt = Some(record.get("objectiveCreatedAt").asLocalDateTime())
+    )
+  }
 }

@@ -119,6 +119,16 @@ object GraphQLSchema {
     (ctx: MyContext, ids: RelationIds[SubjectiveNodeData]) => ctx.dao.getSubjectiveNodeDataByPmhId(ids(subjectByPMHRel)).flatMap(ctx.dao.getSubjectiveData)
   )
 
+  private val objectiveDataFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getObjectiveData(ids)
+  )
+
+
+  private lazy val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
+    Interfaces(IdentifiableType),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
+  )
+
 
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
@@ -126,7 +136,8 @@ object GraphQLSchema {
       ccEncounterFetcher,
       patientMedicalHistoryFetcher,
       subjectiveDataEncFetcher,
-      subjectiveDataPmhFetcher
+      subjectiveDataPmhFetcher,
+      objectiveDataFetcher
     )
 
   private val queryType = ObjectType(
@@ -152,6 +163,8 @@ object GraphQLSchema {
         arguments = List(Ids),
         resolve = config => patientListFetcher.deferSeq(config.arg(Ids))
       ),
+
+
       Field(
         "subjectiveList",
         OptionType(ListType(SubjectiveNodeDataType)),
@@ -184,6 +197,18 @@ object GraphQLSchema {
         OptionType(ListType(PatientMedicalHistoryType)),
         arguments = List(Ids),
         resolve = config => patientMedicalHistoryFetcher.deferSeq(config.arg(Ids))
+      ),
+
+      Field(
+        "objectiveList",
+        OptionType(ListType(ObjectiveDataType)),
+        resolve = c => c.ctx.dao.getObjectiveData
+      ),
+      Field(
+        "objectives",
+        OptionType(ListType(ObjectiveDataType)),
+        arguments = List(Ids),
+        resolve = config => objectiveDataFetcher.deferSeq(config.arg(Ids))
       )
     )
   )
@@ -221,11 +246,18 @@ object GraphQLSchema {
     InputObjectTypeName("PATIENT_MEDICAL_HISTORY_INPUT_TYPE")
   )
 
+  implicit val ObjectiveDataInputType: InputObjectType[Objective] = deriveInputObjectType[Objective](
+    InputObjectTypeName("OBJECT_INPUT_TYPE")
+  )
+
+
   implicit val ccEncFormat: RootJsonFormat[CCEncounter] = jsonFormat4(CCEncounter)
   implicit val PatientMedicalHistoryFormat: RootJsonFormat[PatientMedicalHistory] = jsonFormat7(PatientMedicalHistory)
+  implicit val ObjectiveFormat: RootJsonFormat[Objective] = jsonFormat6(Objective)
 
   implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
   private val SubjectiveNodeDataArg = Argument("subjectiveNodeData", SubjectiveNodeDataInputType)
+  private val ObjectiveDataArg = Argument("objectNodeData", ObjectiveDataInputType)
   private val PatientIdArg = Argument("patientId", IntType)
 
   private val Mutation = ObjectType(
@@ -253,6 +285,13 @@ object GraphQLSchema {
             subjectiveNodeData <- dao.buildRelationForSubjectNode(c.arg(PatientIdArg), subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
           } yield subjectiveNodeData
         }
+      ),
+
+      Field("createObject",
+        ObjectiveDataType,
+        arguments = PatientIdArg :: ObjectiveDataArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.dao.createObject(c.arg(PatientIdArg), c.arg(ObjectiveDataArg))
       ),
 
       /*Field("Login",
