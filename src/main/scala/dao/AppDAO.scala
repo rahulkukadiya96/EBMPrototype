@@ -67,7 +67,7 @@ class AppDAO(connection: Driver) {
     queryString += s" (objective)-[:patient {patId : $patientId }]->(patient) "
 
     queryString += returnObjGenQuery
-    writeData(queryString, readOjective)
+    writeData(queryString, readObjective)
   }
 
 
@@ -137,11 +137,11 @@ class AppDAO(connection: Driver) {
 
   def getObjectiveData: Future[Seq[Objective]] = {
     val queryString = s"MATCH (objective:Objective) " + returnObjGenQuery
-    getData(queryString, readOjective)
+    getData(queryString, readObjective)
   }
   def getObjectiveData(ids: Seq[Int]): Future[Seq[Objective]] = {
     val queryString = s"MATCH (objective:Objective) WHERE ID(objective) IN [${ids.mkString(",")} ] " + returnObjGenQuery
-    getData(queryString, readOjective)
+    getData(queryString, readObjective)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -227,7 +227,7 @@ class AppDAO(connection: Driver) {
 
   private def readSubjectiveNodeId(record: Record): Int = record.get("subjectiveId").asInt()
 
-  private def readOjective(record: Record): Objective = {
+  private def readObjective(record: Record): Objective = {
     Objective(
       id = record.get("objectiveId").asInt(),
       vital = record.get("vital").asString(),
