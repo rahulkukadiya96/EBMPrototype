@@ -34,20 +34,20 @@ class AppDAO(connection: Driver) {
   }
 
   def buildRelationForSubjectNode(patientId: Int, subId: Int, patMedId: Int, ccEncId: Int): Future[SubjectiveNodeData] = {
-    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = ${patientId} "
-    queryString += s"MATCH (subjective: Subjective) WHERE ID(subjective) = ${subId} "
-    queryString += s"MATCH (patientMedicalHistory: PatientMedicalHistory ) WHERE ID(patientMedicalHistory) = ${patMedId} "
-    queryString += s"MATCH (ccEnc: CCEncounter ) WHERE ID(ccEnc) = ${ccEncId} "
+    var queryString = s"MATCH (patient: Patient) WHERE ID(patient) = $patientId "
+    queryString += s"MATCH (subjective: Subjective) WHERE ID(subjective) = $subId "
+    queryString += s"MATCH (patientMedicalHistory: PatientMedicalHistory ) WHERE ID(patientMedicalHistory) = $patMedId "
+    queryString += s"MATCH (ccEnc: CCEncounter ) WHERE ID(ccEnc) = $ccEncId "
 
 
-    queryString += s" CREATE (patient)-[:soap_subject { subId : ${subId}  }]->(subjective), "
-    queryString += s" (subjective)-[:patient {patId : ${patientId} }]->(patient), "
+    queryString += s" CREATE (patient)-[:soap_subject { subId : $subId  }]->(subjective), "
+    queryString += s" (subjective)-[:patient {patId : $patientId }]->(patient), "
 
-    queryString += s" (subjective)-[:pmh { patMedId : ${patMedId} }]->(patientMedicalHistory),"
-    queryString += s" (patientMedicalHistory)-[:subId { subId : ${subId} }]->(subjective), "
+    queryString += s" (subjective)-[:pmh { patMedId : $patMedId }]->(patientMedicalHistory),"
+    queryString += s" (patientMedicalHistory)-[:subId { subId : $subId }]->(subjective), "
 
-    queryString += s" (subjective)-[:ccEnc { ccEnc : ${ccEncId} }]->(ccEnc), "
-    queryString += s" (ccEnc)-[:subId { subId : ${subId} }]->(subjective) "
+    queryString += s" (subjective)-[:ccEnc { ccEnc : $ccEncId }]->(ccEnc), "
+    queryString += s" (ccEnc)-[:subId { subId : $subId }]->(subjective) "
 
     queryString += s" RETURN ID(subjective) as subjectiveId, subjective.createdAt as createdAt, "
     queryString += s" ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt, "
@@ -147,7 +147,7 @@ class AppDAO(connection: Driver) {
     FutureConverters.toScala(queryCompletion)
   }
 
-  def getTodayDateTimeNeo4j(localDateTime: LocalDateTime): String = {
+  private def getTodayDateTimeNeo4j(localDateTime: LocalDateTime): String = {
     s"""localdatetime(
        |{date:date({ year:${localDateTime.getYear}, month:${localDateTime.getMonthValue}, day:${localDateTime.getDayOfMonth}}),
        | time: localtime({ hour:${localDateTime.getHour}, minute:${localDateTime.getMinute}, second:${localDateTime.getSecond}})})
