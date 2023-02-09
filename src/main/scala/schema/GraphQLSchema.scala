@@ -102,7 +102,7 @@ object GraphQLSchema {
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPatientMedicalHistory(ids)
   )
 
-  private lazy val SubjectiveNodeDataType: ObjectType[Unit, SubjectiveNodeData] = deriveObjectType[Unit, SubjectiveNodeData](
+  implicit val SubjectiveNodeDataType: ObjectType[Unit, SubjectiveNodeData] = deriveObjectType[Unit, SubjectiveNodeData](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
@@ -132,17 +132,22 @@ object GraphQLSchema {
   )
 
 
-  private lazy val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
+  implicit val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
-  private lazy val AssessmentDataType: ObjectType[Unit, Assessment] = deriveObjectType[Unit, Assessment](
+  implicit val AssessmentDataType: ObjectType[Unit, Assessment] = deriveObjectType[Unit, Assessment](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
-  private lazy val PlanDataType: ObjectType[Unit, Plan] = deriveObjectType[Unit, Plan](
+  implicit val PlanDataType: ObjectType[Unit, Plan] = deriveObjectType[Unit, Plan](
+    Interfaces(IdentifiableType),
+    ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
+  )
+
+  private lazy val PatientSOAPDataType: ObjectType[Unit, PatientSoap] = deriveObjectType[Unit, PatientSoap](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
@@ -317,6 +322,7 @@ object GraphQLSchema {
   private val PlanDataArg = Argument("planNodeData", PlanDataInputType)
 
   private val PatientIdArg = Argument("patientId", IntType)
+  private val SoapPatientIdArg = Argument("soapId", IntType)
 
   private val Mutation = ObjectType(
     "Mutation",
@@ -330,40 +336,62 @@ object GraphQLSchema {
 
       Field("createSubject",
         SubjectiveNodeDataType,
-        arguments = PatientIdArg :: SubjectiveNodeDataArg :: Nil,
+        arguments = SoapPatientIdArg :: SubjectiveNodeDataArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => {
           val dao = c.ctx.dao
           val subjectiveNodeData: SubjectiveNodeData = c.arg(SubjectiveNodeDataArg)
           for {
-            /*patient <- dao.getPatients(Seq(patientId))*/
             ccEncData <- dao.createCCEnc(subjectiveNodeData.ccEnc)
             patientMedicalHistoryData <- dao.createPatientMedicalHistory(subjectiveNodeData.patientMedicalHistory)
             subjectiveData <- dao.createSubject(subjectiveNodeData)
-            subjectiveNodeData <- dao.buildRelationForSubjectNode(c.arg(PatientIdArg), subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
+            subjectiveNodeData <- dao.buildRelationForSubjectNode(c.arg(SoapPatientIdArg), subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
           } yield subjectiveNodeData
         }
       ),
 
       Field("createObject",
         ObjectiveDataType,
-        arguments = PatientIdArg :: ObjectiveDataArg :: Nil,
+        arguments = SoapPatientIdArg :: ObjectiveDataArg :: Nil,
         tags = Authorized :: Nil,
-        resolve = c => c.ctx.dao.createObject(c.arg(PatientIdArg), c.arg(ObjectiveDataArg))
+        resolve = c => c.ctx.dao.createObject(c.arg(SoapPatientIdArg), c.arg(ObjectiveDataArg))
       ),
 
       Field("createAssessment",
         AssessmentDataType,
-        arguments = PatientIdArg :: AssessmentDataArg :: Nil,
+        arguments = SoapPatientIdArg :: AssessmentDataArg :: Nil,
         tags = Authorized :: Nil,
-        resolve = c => c.ctx.dao.createAssessment(c.arg(PatientIdArg), c.arg(AssessmentDataArg))
+        resolve = c => c.ctx.dao.createAssessment(c.arg(SoapPatientIdArg), c.arg(AssessmentDataArg))
       ),
 
       Field("createPlan",
         PlanDataType,
-        arguments = PatientIdArg :: PlanDataArg :: Nil,
+        arguments = SoapPatientIdArg :: PlanDataArg :: Nil,
         tags = Authorized :: Nil,
-        resolve = c => c.ctx.dao.createPlan(c.arg(PatientIdArg), c.arg(PlanDataArg))
+        resolve = c => c.ctx.dao.createPlan(c.arg(SoapPatientIdArg), c.arg(PlanDataArg))
+      ),
+
+
+      Field("createPatientSOAP",
+        PatientSOAPDataType,
+        arguments = PatientIdArg :: SubjectiveNodeDataArg :: ObjectiveDataArg :: AssessmentDataArg :: PlanDataArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val subjectiveNodeData: SubjectiveNodeData = c.arg(SubjectiveNodeDataArg)
+          val patId = c.arg(PatientIdArg)
+          for {
+            ccEncData <- dao.createCCEnc(subjectiveNodeData.ccEnc)
+            patientMedicalHistoryData <- dao.createPatientMedicalHistory(subjectiveNodeData.patientMedicalHistory)
+            patientSoap <- dao.createSoapNode(patId)
+            subjectiveData <- dao.createSubject(subjectiveNodeData)
+            subjectiveNodeData <- dao.buildRelationForSubjectNode(patientSoap.id, subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
+            objectiveNodeData <- dao.createObject(patientSoap.id, c.arg(ObjectiveDataArg))
+            assessmentNodeData <- dao.createAssessment(patientSoap.id, c.arg(AssessmentDataArg))
+            planNodeData <- dao.createPlan(patientSoap.id, c.arg(PlanDataArg))
+            buildRelationSoapData <- dao.buildRelationSoap(patId, patientSoap.id, subjectiveData.id, objectiveNodeData.id, assessmentNodeData.id, planNodeData.id)
+          } yield PatientSoap(patientSoap.id, patId, subjectiveNodeData, objectiveNodeData, assessmentNodeData, planNodeData, patientSoap.createdAt)
+        }
       ),
 
       /*Field("Login",
