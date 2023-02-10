@@ -394,7 +394,6 @@ object GraphQLSchema {
         resolve = c => c.ctx.dao.createPlan(c.arg(SoapPatientIdArg), c.arg(PlanDataArg))
       ),
 
-
       Field("createPatientSOAP",
         PatientSOAPDataType,
         arguments = PatientIdArg :: SubjectiveNodeDataArg :: ObjectiveDataArg :: AssessmentDataArg :: PlanDataArg :: Nil,
@@ -416,6 +415,35 @@ object GraphQLSchema {
           } yield PatientSoap(patientSoap.id, patId, subjectiveNodeData, objectiveNodeData, assessmentNodeData, planNodeData, patientSoap.createdAt)
         }
       ),
+
+      Field("deletePatientSOAP",
+        BooleanType,
+        arguments = SoapPatientIdArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.dao.deleteSoap(c.arg(SoapPatientIdArg))
+      ),
+
+      /*Field("updatePatientSOAP",
+        PatientSOAPDataType,
+        arguments = PatientIdArg :: SubjectiveNodeDataArg :: ObjectiveDataArg :: AssessmentDataArg :: PlanDataArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val subjectiveNodeData: SubjectiveNodeData = c.arg(SubjectiveNodeDataArg)
+          val patId = c.arg(PatientIdArg)
+          for {
+            ccEncData <- dao.createCCEnc(subjectiveNodeData.ccEnc)
+            patientMedicalHistoryData <- dao.createPatientMedicalHistory(subjectiveNodeData.patientMedicalHistory)
+            patientSoap <- dao.createSoapNode(patId)
+            subjectiveData <- dao.createSubject(subjectiveNodeData)
+            subjectiveNodeData <- dao.buildRelationForSubjectNode(patientSoap.id, subjectiveData.id, patientMedicalHistoryData.id, ccEncData.id)
+            objectiveNodeData <- dao.createObject(patientSoap.id, c.arg(ObjectiveDataArg))
+            assessmentNodeData <- dao.createAssessment(patientSoap.id, c.arg(AssessmentDataArg))
+            planNodeData <- dao.createPlan(patientSoap.id, c.arg(PlanDataArg))
+            _ <- dao.buildRelationSoap(patId, patientSoap.id, subjectiveData.id, objectiveNodeData.id, assessmentNodeData.id, planNodeData.id)
+          } yield PatientSoap(patientSoap.id, patId, subjectiveNodeData, objectiveNodeData, assessmentNodeData, planNodeData, patientSoap.createdAt)
+        }
+      ),*/
 
       /*Field("Login",
         PatientType,

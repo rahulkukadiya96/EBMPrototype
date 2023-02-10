@@ -7,6 +7,7 @@ import utility.DateTimeFormatUtil.getCurrentUTCTime
 import java.time.LocalDateTime
 import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class AppDAO(connection: Driver) {
@@ -154,7 +155,7 @@ class AppDAO(connection: Driver) {
     getData(queryString, readSubjectiveNodeData)
   }
 
-  val returnSubjectiveGenQuery = " ID(subjective) as subjectiveId, subjective.createdAt as createdAt, ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt,  ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+  private val returnSubjectiveGenQuery = " ID(subjective) as subjectiveId, subjective.createdAt as createdAt, ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt,  ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
 
   def getSubjectiveData(ids: Seq[Int]): Future[Seq[SubjectiveNodeData]] = {
     var queryString = s"MATCH (subjective:Subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter) "
@@ -262,6 +263,14 @@ class AppDAO(connection: Driver) {
     getData(queryString, readPatientSoapNode)
   }
 
+
+  def deleteSoap(id: Int): Future[Boolean] = {
+    val queryString = s"MATCH (patientSOAP:Patient_SOAP) WHERE ID(patientSOAP) = $id DETACH DELETE patientSOAP"
+    Future {
+      deleteNode(queryString)
+    }
+  }
+
   private def writeData[T](query: String, reader: Record => T) = {
     val session = connection.session()
     val queryCompletion = session
@@ -287,6 +296,8 @@ class AppDAO(connection: Driver) {
 
     FutureConverters.toScala(queryCompletion)
   }
+
+  private def deleteNode(query: String) = connection.session().run(query).summary().counters().nodesDeleted() > 0
 
   private def getTodayDateTimeNeo4j(localDateTime: LocalDateTime): String = {
     s"""localdatetime(
