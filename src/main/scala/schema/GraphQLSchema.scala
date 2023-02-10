@@ -94,7 +94,8 @@ object GraphQLSchema {
    */
   implicit val PatientMedicalHistoryType: ObjectType[Unit, PatientMedicalHistory] = deriveObjectType[Unit, PatientMedicalHistory](
     Interfaces(IdentifiableType),
-    AddFields(Field("Subjective", ListType(SubjectiveNodeDataType), resolve = c => subjectiveDataPmhFetcher.deferRelSeq(subjectByPMHRel, c.value.id))),
+    AddFields(
+      Field("Subjective", ListType(SubjectiveNodeDataType), resolve = c => subjectiveDataPmhFetcher.deferRelSeq(subjectByPMHRel, c.value.id))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
@@ -131,6 +132,11 @@ object GraphQLSchema {
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPlanData(ids)
   )
 
+  private val patientSoapDataFetcher = Fetcher(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSoapData(ids)
+  )
+
+
 
   implicit val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
     Interfaces(IdentifiableType),
@@ -162,7 +168,8 @@ object GraphQLSchema {
       subjectiveDataPmhFetcher,
       objectiveDataFetcher,
       assessmentDataFetcher,
-      planDataFetcher
+      planDataFetcher,
+      patientSoapDataFetcher
     )
 
   private val queryType = ObjectType(
@@ -258,6 +265,18 @@ object GraphQLSchema {
         OptionType(ListType(PlanDataType)),
         arguments = List(Ids),
         resolve = config => planDataFetcher.deferSeq(config.arg(Ids))
+      ),
+
+      Field(
+        "soapList",
+        OptionType(ListType(PatientSOAPDataType)),
+        resolve = c => c.ctx.dao.getSoapData
+      ),
+      Field(
+        "soap",
+        OptionType(ListType(PatientSOAPDataType)),
+        arguments = List(Ids),
+        resolve = config => patientSoapDataFetcher.deferSeq(config.arg(Ids))
       )
     )
   )
@@ -389,7 +408,7 @@ object GraphQLSchema {
             objectiveNodeData <- dao.createObject(patientSoap.id, c.arg(ObjectiveDataArg))
             assessmentNodeData <- dao.createAssessment(patientSoap.id, c.arg(AssessmentDataArg))
             planNodeData <- dao.createPlan(patientSoap.id, c.arg(PlanDataArg))
-            buildRelationSoapData <- dao.buildRelationSoap(patId, patientSoap.id, subjectiveData.id, objectiveNodeData.id, assessmentNodeData.id, planNodeData.id)
+            _ <- dao.buildRelationSoap(patId, patientSoap.id, subjectiveData.id, objectiveNodeData.id, assessmentNodeData.id, planNodeData.id)
           } yield PatientSoap(patientSoap.id, patId, subjectiveNodeData, objectiveNodeData, assessmentNodeData, planNodeData, patientSoap.createdAt)
         }
       ),

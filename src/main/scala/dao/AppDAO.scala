@@ -57,7 +57,7 @@ class AppDAO(connection: Driver) {
   }
 
 
-  private val returnObjGenQuery = s" RETURN ID(objective) as objectiveId, objective.vital as vital, objective.labTest as labTest, objective.physicalExam as physicalExam, objective.diagnosticData as diagnosticData, objective.createdAt as objectiveCreatedAt"
+  private val returnObjGenQuery = s" ID(objective) as objectiveId, objective.vital as vital, objective.labTest as labTest, objective.physicalExam as physicalExam, objective.diagnosticData as diagnosticData, objective.createdAt as objectiveCreatedAt"
 
   def createObject(patientSoapId: Int, objective: Objective): Future[Objective] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
@@ -70,7 +70,7 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readObjective)
   }
 
-  private val returnAssessmentGenQuery = s" RETURN ID(assessment) as assessmentId, assessment.ddx as ddx, assessment.mechanism as mechanism, assessment.createdAt as assessmentCreatedAt"
+  private val returnAssessmentGenQuery = s" ID(assessment) as assessmentId, assessment.ddx as ddx, assessment.mechanism as mechanism, assessment.createdAt as assessmentCreatedAt"
 
   def createAssessment(patientSoapId: Int, assessment: Assessment): Future[Assessment] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
@@ -83,7 +83,7 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readAssessment)
   }
 
-  private val returnPlanGenQuery = s" RETURN ID(plan) as planId, plan.indication as indication, plan.management as management, plan.summary as summary, plan.followup as followup, plan.createdAt as planCreatedAt"
+  private val returnPlanGenQuery = s" ID(plan) as planId, plan.indication as indication, plan.management as management, plan.summary as summary, plan.followup as followup, plan.createdAt as planCreatedAt"
 
   def createPlan(patientSoapId: Int, plan: Plan): Future[Plan] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
@@ -100,10 +100,10 @@ class AppDAO(connection: Driver) {
     var queryString = s"CREATE (soap : Patient_SOAP{ patientId: $patientId,  createdAt : ${getTodayDateTimeNeo4j(getCurrentUTCTime)} }) "
 
     queryString += "RETURN ID(soap) as soapId, soap.patientId as patientId, soap.createdAt as soapCreatedAt"
-    writeData(queryString, readPatientSoapNode)
+    writeData(queryString, readPatientSoapCreatedNode)
   }
 
-  def buildRelationSoap(patId : Int, soapNodeId: Int, subId : Int, objectNodeId: Int, assessmentNodeId: Int, planNodeId: Int): Future[PatientSoap] = {
+  def buildRelationSoap(patId: Int, soapNodeId: Int, subId: Int, objectNodeId: Int, assessmentNodeId: Int, planNodeId: Int): Future[PatientSoap] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
     queryString += s"MATCH (patient: Patient) WHERE ID(patient) = $patId "
     queryString += s"MATCH (subjective: Subjective) WHERE ID(subjective) = $subId "
@@ -128,7 +128,7 @@ class AppDAO(connection: Driver) {
 
     queryString += "RETURN ID(patientSOAP) as soapId, patientSOAP.patientId as patientId, patientSOAP.createdAt as soapCreatedAt"
 
-    writeData(queryString, readPatientSoapNode)
+    writeData(queryString, readPatientSoapCreatedNode)
   }
 
 
@@ -154,12 +154,12 @@ class AppDAO(connection: Driver) {
     getData(queryString, readSubjectiveNodeData)
   }
 
+  val returnSubjectiveGenQuery = " ID(subjective) as subjectiveId, subjective.createdAt as createdAt, ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt,  ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+
   def getSubjectiveData(ids: Seq[Int]): Future[Seq[SubjectiveNodeData]] = {
     var queryString = s"MATCH (subjective:Subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter) "
-    queryString += s" WHERE ID(subjective) IN [${ids.mkString(",")}]"
-    queryString += " RETURN ID(subjective) as subjectiveId, subjective.createdAt as createdAt, "
-    queryString += " ID(patientMedicalHistory) as patientMedicalHistoryId, patientMedicalHistory.medications as medications, patientMedicalHistory.allergies as allergies, patientMedicalHistory.procedure as procedure, patientMedicalHistory.familyHistory as familyHistory, patientMedicalHistory.demographics as demographics, patientMedicalHistory.createdAt as patientMedicalHistoryCreatedAt, "
-    queryString += " ID(ccEnc) as ccEncId, ccEnc.signs as signs, ccEnc.symptoms as symptoms, ccEnc.createdAt as ccEncCreatedAt"
+    queryString += s" WHERE ID(subjective) IN [${ids.mkString(",")}] RETURN "
+    queryString += returnSubjectiveGenQuery
     getData(queryString, readSubjectiveNodeData)
   }
 
@@ -197,34 +197,69 @@ class AppDAO(connection: Driver) {
   }
 
   def getObjectiveData: Future[Seq[Objective]] = {
-    val queryString = s"MATCH (objective:Objective) " + returnObjGenQuery
+    val queryString = s"MATCH (objective:Objective) RETURN " + returnObjGenQuery
     getData(queryString, readObjective)
   }
 
   def getObjectiveData(ids: Seq[Int]): Future[Seq[Objective]] = {
-    val queryString = s"MATCH (objective:Objective) WHERE ID(objective) IN [${ids.mkString(",")} ] " + returnObjGenQuery
+    val queryString = s"MATCH (objective:Objective) WHERE ID(objective) IN [${ids.mkString(",")} ] RETURN " + returnObjGenQuery
     getData(queryString, readObjective)
   }
 
 
   def getAssessmentData: Future[Seq[Assessment]] = {
-    val queryString = s"MATCH (assessment:Assessment) " + returnAssessmentGenQuery
+    val queryString = s"MATCH (assessment:Assessment) RETURN " + returnAssessmentGenQuery
     getData(queryString, readAssessment)
   }
 
   def getAssessmentData(ids: Seq[Int]): Future[Seq[Assessment]] = {
-    val queryString = s"MATCH (assessment:Assessment) WHERE ID(assessment) IN [${ids.mkString(",")} ] " + returnAssessmentGenQuery
+    val queryString = s"MATCH (assessment:Assessment) WHERE ID(assessment) IN [${ids.mkString(",")} ] RETURN " + returnAssessmentGenQuery
     getData(queryString, readAssessment)
   }
 
   def getPlanData: Future[Seq[Plan]] = {
-    val queryString = s"MATCH (plan:Plan) " + returnPlanGenQuery
+    val queryString = s"MATCH (plan:Plan) RETURN " + returnPlanGenQuery
     getData(queryString, readPlan)
   }
 
   def getPlanData(ids: Seq[Int]): Future[Seq[Plan]] = {
-    val queryString = s"MATCH (plan:Plan) WHERE ID(plan) IN [${ids.mkString(",")} ] " + returnPlanGenQuery
+    val queryString = s"MATCH (plan:Plan) WHERE ID(plan) IN [${ids.mkString(",")} ] RETURN " + returnPlanGenQuery
     getData(queryString, readPlan)
+  }
+
+  private val returnGenStForPatientSoap = "ID(patientSOAP) as soapId, patientSOAP.patientId as patientId, patientSOAP.createdAt as soapCreatedAt"
+
+  def getSoapData: Future[Seq[PatientSoap]] = {
+    var queryString = s"MATCH (patientSOAP:Patient_SOAP) - [:soap_subject] -> (subjective:Subjective), (patientSOAP) - [:soap_object] -> (objective:Objective), (patientSOAP) - [:soap_assessment] -> (assessment:Assessment), (patientSOAP) - [:soap_plan] -> (plan:Plan), "
+    queryString += " (subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter) RETURN "
+    queryString += returnGenStForPatientSoap + ", "
+    queryString += returnSubjectiveGenQuery + ", "
+    queryString += returnObjGenQuery + ", "
+    queryString += returnAssessmentGenQuery + ","
+    queryString += returnPlanGenQuery
+    getData(queryString, readPatientSoapNode)
+  }
+
+  def getSoapData(ids: Seq[Int]): Future[Seq[PatientSoap]] = {
+    var queryString = s"MATCH (patientSOAP:Patient_SOAP) - [:soap_subject] -> (subjective:Subjective), (patientSOAP) - [:soap_object] -> (objective:Objective), (patientSOAP) - [:soap_assessment] -> (assessment:Assessment), (patientSOAP) - [:soap_plan] -> (plan:Plan), "
+    queryString += s"(subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter)  WHERE ID(patientSOAP) IN [${ids.mkString(",")} ] RETURN  "
+    queryString += returnGenStForPatientSoap + ", "
+    queryString += returnSubjectiveGenQuery + ", "
+    queryString += returnObjGenQuery + ", "
+    queryString += returnAssessmentGenQuery + ","
+    queryString += returnPlanGenQuery
+    getData(queryString, readPatientSoapNode)
+  }
+
+  def getSoapDataByPatientId(ids: Seq[Int]): Future[Seq[PatientSoap]] = {
+    var queryString = s"MATCH (patientSOAP:Patient_SOAP) - [:soap_subject] -> (subjective:Subjective), (patientSOAP) - [:soap_object] -> (objective:Objective), (patientSOAP) - [:soap_assessment] -> (assessment:Assessment), (patientSOAP) - [:soap_plan] -> (plan:Plan), "
+    queryString += s"(subjective) -[:pmh]-> (patientMedicalHistory:PatientMedicalHistory), (subjective) -[:ccEnc] -> (ccEnc:CCEncounter)  WHERE patientSOAP.patientId IN [${ids.mkString(",")} ] RETURN  "
+    queryString += returnGenStForPatientSoap + ", "
+    queryString += returnSubjectiveGenQuery + ", "
+    queryString += returnObjGenQuery + ", "
+    queryString += returnAssessmentGenQuery + ","
+    queryString += returnPlanGenQuery
+    getData(queryString, readPatientSoapNode)
   }
 
   private def writeData[T](query: String, reader: Record => T) = {
@@ -341,7 +376,7 @@ class AppDAO(connection: Driver) {
     )
   }
 
-  private def readPatientSoapNode(record: Record): PatientSoap = {
+  private def readPatientSoapCreatedNode(record: Record): PatientSoap = {
     PatientSoap(
       id = record.get("soapId").asInt(),
       patientId = record.get("patientId").asInt(),
@@ -349,6 +384,18 @@ class AppDAO(connection: Driver) {
       objective = null,
       assessment = null,
       plan = null,
+      createdAt = Some(record.get("soapCreatedAt").asLocalDateTime())
+    )
+  }
+
+  private def readPatientSoapNode(record: Record): PatientSoap = {
+    PatientSoap(
+      id = record.get("soapId").asInt(),
+      patientId = record.get("patientId").asInt(),
+      subjectiveNodeData = readSubjectiveNodeData(record),
+      objective = readObjective(record),
+      assessment = readAssessment(record),
+      plan = readPlan(record),
       createdAt = Some(record.get("soapCreatedAt").asLocalDateTime())
     )
   }
