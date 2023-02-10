@@ -64,7 +64,7 @@ object GraphQLSchema {
     )
   )
 
-  private val patientType = deriveObjectType[Unit, Patient](
+  private val PatientType = deriveObjectType[Unit, Patient](
     Interfaces(IdentifiableType),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
   )
@@ -78,6 +78,8 @@ object GraphQLSchema {
    */
   private val subjectByCCEncRel = Relation[SubjectiveNodeData, Int]("byEnc", l => Seq(l.ccEnc.id))
   private val subjectByPMHRel = Relation[SubjectiveNodeData, Int]("byPatientMedicalHistory", l => Seq(l.patientMedicalHistory.id))
+
+  private val soapByPatientId = Relation[PatientSoap, Int]("byPatientId", l => Seq(l.patientId))
 
   implicit val CCEncounterType: ObjectType[Unit, CCEncounter] = deriveObjectType[Unit, CCEncounter](
     Interfaces(IdentifiableType),
@@ -132,8 +134,9 @@ object GraphQLSchema {
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getPlanData(ids)
   )
 
-  private val patientSoapDataFetcher = Fetcher(
-    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSoapData(ids)
+  private val patientSoapDataFetcher = Fetcher.rel(
+    (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSoapData(ids),
+    (ctx: MyContext, ids: RelationIds[PatientSoap]) => ctx.dao.getSoapDataByPatientId(ids(soapByPatientId))
   )
 
 
@@ -155,6 +158,7 @@ object GraphQLSchema {
 
   private lazy val PatientSOAPDataType: ObjectType[Unit, PatientSoap] = deriveObjectType[Unit, PatientSoap](
     Interfaces(IdentifiableType),
+    ReplaceField("patientId", Field("patient", PatientType, resolve = c => patientListFetcher.defer(c.value.patientId))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
@@ -177,13 +181,13 @@ object GraphQLSchema {
     fields[MyContext, Unit](
       Field(
         "patientList",
-        ListType(patientType),
+        ListType(PatientType),
         resolve = c => c.ctx.dao.patientList
       ),
 
       Field(
         "patient",
-        OptionType(patientType),
+        OptionType(PatientType),
         arguments = Id :: Nil,
         //resolve = config => config.ctx.dao.getPatient(config.arg(Id))
         resolve = config => patientListFetcher.deferOpt(config.arg(Id))
@@ -191,7 +195,7 @@ object GraphQLSchema {
 
       Field(
         "patients",
-        OptionType(ListType(patientType)),
+        OptionType(ListType(PatientType)),
         arguments = List(Ids),
         resolve = config => patientListFetcher.deferSeq(config.arg(Ids))
       ),
@@ -347,7 +351,7 @@ object GraphQLSchema {
     "Mutation",
     fields[MyContext, Unit](
       Field("createPatient",
-        patientType,
+        PatientType,
         arguments = NameArg :: AgeType :: AddressArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.createPatient(Patient(0, c.arg(NameArg), c.arg(AgeType), c.arg(AddressArg)))
@@ -414,7 +418,7 @@ object GraphQLSchema {
       ),
 
       /*Field("Login",
-        patientType,
+        PatientType,
         arguments = EmailType :: PasswordType :: Nil,
         resolve = ctx => UpdateCtx(
           ctx.ctx.login(ctx.arg(EmailType), ctx.arg(PasswordType))) { patient =>
