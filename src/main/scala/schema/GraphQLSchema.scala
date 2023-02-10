@@ -66,6 +66,7 @@ object GraphQLSchema {
 
   private val PatientType = deriveObjectType[Unit, Patient](
     Interfaces(IdentifiableType),
+    AddFields(Field("soaps", ListType(PatientSOAPDataType), resolve = c => patientSoapDataFetcher.deferRelSeq(soapByPatientId, c.value.id))),
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt))
   )
 
@@ -138,7 +139,6 @@ object GraphQLSchema {
     (ctx: MyContext, ids: Seq[Int]) => ctx.dao.getSoapData(ids),
     (ctx: MyContext, ids: RelationIds[PatientSoap]) => ctx.dao.getSoapDataByPatientId(ids(soapByPatientId))
   )
-
 
 
   implicit val ObjectiveDataType: ObjectType[Unit, Objective] = deriveObjectType[Unit, Objective](
