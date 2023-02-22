@@ -21,6 +21,8 @@ lazy val root = (project in file("."))
     libraryDependencies += "io.monix" %% "monix" % "3.0.0-RC1",
 
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+    libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0",
+    libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0" classifier "models",
     libraryDependencies += scalaTest % Test
   )
 
