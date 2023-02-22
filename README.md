@@ -32,10 +32,10 @@ SOAP Notes --> PICO Elements --> Mesh Elements (Search Terms) --> Build Search S
 
 For example, if a SOAP note describes a patient with a cough and fever who was diagnosed with pneumonia and started on antibiotics 
 The PICO elements could be:
-P: Patients with pneumonia symptoms
-I: Antibiotic treatment
-C: Alternative antibiotic treatment options
-O: Improvement in pneumonia symptoms
+* P: Patients with pneumonia symptoms
+* I: Antibiotic treatment
+* C: Alternative antibiotic treatment options
+* O: Improvement in pneumonia symptoms
 
 # Search Terms
 **Keywords** 
@@ -62,11 +62,12 @@ Below operators is used to fetch the result from the Pubmed database
 So, Ideally query would be (P1 OR P2 OR P3) and (I1 or I2) and (C1 or C2) and (O1 or O2 or O3)
 
 * **Scenario**: A 64-year-old obese male who has tried many ways to lose weight presents with a newspaper article about ‘fat-blazer’ (chitosan). He asks for your advice.
-  1) Population/problem ::-	obes* OR overweight (2)
-  2) Indicator  ::- (intervention, test, etc)	chitosan (1)
-  3) Comparator ::-	placebo (4)
-  4) Outcome	::- decrease weight OR kilogram* (3)
-  Query would be :: #1 AND #2 AND #3 AND #4
+  * Population/problem ::-	obes* OR overweight (2)
+  * Indicator  ::- (intervention, test, etc)	chitosan (1)
+  *  Comparator ::-	placebo (4)
+  *  Outcome	::- decrease weight OR kilogram* (3) 
+  
+   Query would be **#1 AND #2 AND #3 AND #4**
 
 # Query Filter
 This is used to narrow down the results. It includes some basic filter like publication date, species article type etc.
