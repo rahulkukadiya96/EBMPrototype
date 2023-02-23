@@ -5,10 +5,10 @@ import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
-import scala.collection.JavaConverters._
-import scala.compat.java8.FutureConverters
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.CollectionHasAsScala
+import scala.jdk.FutureConverters
 
 class AppDAO(connection: Driver) {
   def createPatient(patient: Patient): Future[Patient] = {
@@ -281,7 +281,7 @@ class AppDAO(connection: Driver) {
       }
       .whenComplete((_, _) => session.closeAsync())
 
-    FutureConverters.toScala(queryCompletion)
+    FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
   private def getData[T](query: String, reader: Record => T) = {
@@ -290,11 +290,11 @@ class AppDAO(connection: Driver) {
       .runAsync(query)
       .thenCompose[java.util.List[T]](c => c.listAsync[T](record => reader(record)))
       .thenApply[Seq[T]] {
-        _.asScala
+        _.asScala.toSeq
       }
       .whenComplete((_, _) => session.closeAsync())
 
-    FutureConverters.toScala(queryCompletion)
+    FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
   private def deleteNode(query: String) = connection.session().run(query).summary().counters().nodesDeleted() > 0

@@ -2,15 +2,20 @@ import Dependencies._
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
-ThisBuild / scalaVersion := "2.12.3"
+ThisBuild / scalaVersion := "2.13.10"
 
 lazy val root = (project in file("."))
   .settings(
     name := "EBMPrototype",
     //    libraryDependencies += "org.typelevel" %% "cats-core" % "2.9.0",
-    libraryDependencies += "org.sangria-graphql" %% "sangria" % "1.3.0",
-    libraryDependencies += "org.sangria-graphql" %% "sangria-spray-json" % "1.0.0",
+    libraryDependencies += "org.sangria-graphql" %% "sangria" % "2.1.2",
+    libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2",
+    libraryDependencies += "org.sangria-graphql" %% "sangria-akka-http-core" % "0.0.2",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
+    libraryDependencies += "org.sangria-graphql" %% "sangria-spray-json" % "1.0.3",
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+    libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.6.16",
+    libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.6.16",
     libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
 
     libraryDependencies += "com.typesafe.slick" %% "slick" % slickVersion,
@@ -18,11 +23,12 @@ lazy val root = (project in file("."))
     libraryDependencies += "org.slf4j" % "slf4j-nop" % "1.6.6",
     libraryDependencies += "com.h2database" % "h2" % "1.4.196",
     libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "1.6.1",
-    libraryDependencies += "io.monix" %% "monix" % "3.0.0-RC1",
+    libraryDependencies += "io.monix" %% "monix" % "3.1.0",
 
-    libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+    libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
     libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0",
     libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0" classifier "models",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.1.0",
     libraryDependencies += scalaTest % Test
   )
 

@@ -2,10 +2,9 @@ package convertor
 
 import edu.stanford.nlp.ling.CoreAnnotations.{LemmaAnnotation, PartOfSpeechAnnotation}
 import edu.stanford.nlp.pipeline.{CoreDocument, StanfordCoreNLP}
-import models.{PatientSoap, Pico}
 
 import java.util.Properties
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 object Preprocessor {
   def preprocessText(text: String): String = {

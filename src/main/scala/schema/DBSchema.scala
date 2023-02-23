@@ -44,7 +44,7 @@ object DBSchema extends StrictLogging {
 
     val result = retry("Acquire Neo4j connection", connectionAttempt(), 5.seconds, 10.seconds, 10)
 
-    Await.result(result.runAsync, 55.seconds)
+    Await.result(result.runToFuture, 55.seconds)
   }
 
   private def retry[T](name: String, originalTask: => Task[T], delay: FiniteDuration, timeout: FiniteDuration, retries: Int): Task[T] = {
