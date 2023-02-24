@@ -1,44 +1,42 @@
 package generator
 
+import generator.ExternalCallUtils.{callApi, extractIdFromXml}
+import generator.MeSHSearch.searchSubjectHeading
 import models.Pico
-import parser.CustomXMLParser
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.io.Source
-import scala.util.Using
-import scala.xml.XML
 
 object PubMedSearch {
+  val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+  val OR = " OR "
+  val AND = " AND "
+  val PUBMED_DB_NAME = "pubmed"
 
-  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = Future {
-    val baseUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-//    val query = buildQuery(pico)
+  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
+    //    val query = buildQuery(pico)
     val query = "cancer"
-    val url = s"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
-    Using(Source.fromURL(url)) {
-      data =>
-        try {
-          //        print(s"Data is ${data.mkString}")
-          val xml = CustomXMLParser.loadString(data.mkString)
-          val datas = (xml \\ "IdList" \\ "Id").map(_.text)
-          print(s"Data is $datas")
-          if ((xml \\ "ErrorList" \\ "Error").nonEmpty) {
-            throw new RuntimeException(s"PubMed API error: ${(xml \\ "ErrorList" \\ "Error" \ "Message").text}")
-          } else {
-            (xml \\ "IdList" \\ "Id").map(_.text)
-          }
-        } catch {
-          case e : Exception => {
-            e.printStackTrace()
-            Seq.empty
-          }
-        }
-    }.getOrElse {
-      Seq.empty
+    val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
+    for {
+      problem_search_terms <- searchSubjectHeading(pico.problem, subjectHeadingJoiner)
+      outcome_search_terms <- searchSubjectHeading(pico.outcome, subjectHeadingJoiner)
+      intervention_search_terms <- searchSubjectHeading(pico.intervention, subjectHeadingJoiner)
+      comparision_search_terms <- searchSubjectHeading(pico.intervention, subjectHeadingJoiner)
+      query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+      url <- buildUrl(query, retMax)
+      ids <- callApi(url, extractIdFromXml)
+    } yield {
+      println(s"problem_search_terms is  ${problem_search_terms}")
+      println(s"Final Id list is ${ids.size}")
+      ids
     }
   }
 
+  def subjectHeadingJoiner(seq: Seq[String]): Future[String] = Future {
+    joiner(seq, OR)
+  }
+
+  def joiner[A](seq: Seq[A], del: String): String = seq.mkString(del)
 
   /*def searchAll(pico: Pico, email: String): Future[Seq[String]] = {
     val retmax = 10000
@@ -81,5 +79,13 @@ object PubMedSearch {
 
     val query = s"$patientQuery AND $interventionQuery AND $comparisonQuery AND $outcomeQuery"
     query
+  }
+
+  private def buildQuery(patientQuery: String, interventionQuery: String, outcomeQuery: String, comparisonQuery: String): Future[String] = Future {
+    s"($patientQuery) AND ($interventionQuery) AND ($comparisonQuery) AND ($outcomeQuery)"
+  }
+
+  private def buildUrl(query: String, retMax: Int): Future[String] = Future {
+    s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=$query&retmax=$retMax"
   }
 }
