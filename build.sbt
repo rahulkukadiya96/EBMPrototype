@@ -11,7 +11,10 @@ lazy val root = (project in file("."))
     libraryDependencies += "org.sangria-graphql" %% "sangria" % "2.1.2",
     libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2",
     libraryDependencies += "org.sangria-graphql" %% "sangria-akka-http-core" % "0.0.2",
+
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
     libraryDependencies += "org.sangria-graphql" %% "sangria-spray-json" % "1.0.3",
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.6.16",
@@ -29,6 +32,7 @@ lazy val root = (project in file("."))
     libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0",
     libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0" classifier "models",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.1.0",
+
     libraryDependencies += scalaTest % Test
   )
 

@@ -1,5 +1,6 @@
 package generator
 
+import classifier.MeSHClassifier.classifyTerms
 import generator.ExternalCallUtils.{callApi, extractIdFromXml}
 import generator.MeSHSearch.searchSubjectHeading
 import models.Pico
@@ -14,15 +15,25 @@ object PubMedSearch {
   val PUBMED_DB_NAME = "pubmed"
 
   def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
-    //    val query = buildQuery(pico)
-    val query = "cancer"
-    val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
+    /*val query = buildQuery(pico)
+      val query = "cancer"
+      val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
+    */
     for {
-      problem_search_terms <- searchSubjectHeading(pico.problem, subjectHeadingJoiner)
-      outcome_search_terms <- searchSubjectHeading(pico.outcome, subjectHeadingJoiner)
-      intervention_search_terms <- searchSubjectHeading(pico.intervention, subjectHeadingJoiner)
-      comparision_search_terms <- searchSubjectHeading(pico.intervention, subjectHeadingJoiner)
+      problem_terms <- classifyTerms(pico.problem.split(" "))
+      problem_search_terms <- searchSubjectHeading(problem_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      outcome_terms <- classifyTerms(pico.outcome.split(" "))
+      outcome_search_terms <- searchSubjectHeading(outcome_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      intervention_terms <- classifyTerms(pico.intervention.split(" "))
+      intervention_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      intervention_terms <- classifyTerms(pico.comparison.get.split(" "))
+      comparision_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
       query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+
       url <- buildUrl(query, retMax)
       ids <- callApi(url, extractIdFromXml)
     } yield {

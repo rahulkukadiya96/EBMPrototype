@@ -14,9 +14,27 @@ object ExternalCallUtils {
     Using(Source.fromURL(url)) {
       data =>
         try {
+          print(s"data is $data")
           val xml = CustomXMLParser.loadString(data.mkString)
-          /*println(s"Generated xml is $xml")*/
+          println(s"Generated xml is $xml")
           processor(xml)
+        } catch {
+          case e: Exception =>
+            e.printStackTrace()
+            Seq.empty
+        }
+    }.getOrElse {
+      Seq.empty
+    }
+  }
+
+  def consumeJsonAPI[A](url: String, processor: String => Seq[A]): Future[Seq[A]] = Future {
+    println(s"URL for endpoint is $url")
+    Using(Source.fromURL(url)) {
+      data =>
+        try {
+          println(s"Generated xml is ${data.mkString}")
+          processor(data.mkString)
         } catch {
           case e: Exception =>
             e.printStackTrace()
