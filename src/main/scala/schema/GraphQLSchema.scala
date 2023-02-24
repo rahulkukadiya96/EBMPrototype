@@ -2,6 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
+import generator.PubMedSearch
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
@@ -302,6 +303,7 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
+            data <- PubMedSearch.fetchData((transformList(fetchPicoRequest.comparison)(patientSoapList)).head, 10)
           } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
         }
       )
