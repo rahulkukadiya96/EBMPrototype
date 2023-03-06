@@ -1,6 +1,5 @@
 package generator
 
-import classifier.MeSHClassifier.classifyTerms
 import dao.MeSHLoaderDao
 import generator.ExternalCallUtils.{callApi, extractIdFromXml}
 import generator.MeSHSearch.searchSubjectHeading
@@ -63,7 +62,7 @@ object PubMedSearch {
 
           query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
         } yield {
-          return Option(query) match {
+          return query match {
             case Some(queryStr) =>
               for {
                 url <- buildUrl(queryStr, retMax)
@@ -134,8 +133,12 @@ object PubMedSearch {
     query
   }
 
-  private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[String] = Future {
-    List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).mkString("(", AND, ")")
+  private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[Option[String]] = Future {
+    val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get)
+    queryList.isEmpty match {
+      case true => Option.empty
+      case false => Option(queryList.mkString("(", AND, ")"))
+    }
   }
 
   private def buildUrl(query: String, retMax: Int): Future[String] = Future {
