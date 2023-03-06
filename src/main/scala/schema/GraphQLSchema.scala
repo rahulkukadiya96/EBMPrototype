@@ -315,7 +315,7 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- PubMedSearch.fetchData((transformList(fetchPicoRequest.comparison)(patientSoapList)).head, 10)
+            data <- PubMedSearch.fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, config.ctx.meSHLoader, 10)
           } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
         }
       )
@@ -383,6 +383,8 @@ object GraphQLSchema {
 
   private val PatientIdArg = Argument("patientId", IntType)
   private val SoapPatientIdArg = Argument("soapId", IntType)
+
+  private val MeshPathArg = Argument("filePath", StringType)
 
   private val Mutation = ObjectType(
     "Mutation",
@@ -458,6 +460,13 @@ object GraphQLSchema {
         arguments = SoapPatientIdArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.deleteSoap(c.arg(SoapPatientIdArg))
+      ),
+
+      Field("loadMeshTerms",
+        BooleanType,
+        arguments = MeshPathArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.meSHLoader.loadDictionary(c.arg(MeshPathArg))
       ),
 
       /*Field("updatePatientSOAP",

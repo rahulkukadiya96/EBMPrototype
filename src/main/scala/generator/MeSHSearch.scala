@@ -12,17 +12,25 @@ object MeSHSearch {
   val MESH_DB_NAME = "mesh"
   val API_KEY = s"&api_key=${config.getString("ncbi_api_key")}"
 
-  def searchSubjectHeading(text: Seq[String], queryBuilder: Seq[String] => Future[String]): Future[String] = {
-    val terms = text.mkString(",")
-    for {
-      ids <- callApi(s"$BASE_URL/esearch.fcgi?db=$MESH_DB_NAME&term=$terms$API_KEY", extractIdFromXml)
-      summaries <- fetchSummaryData(ids.mkString(","))
-      query <- queryBuilder(summaries)
-    } yield {
-      //      println(s"ids is $ids")
-//      println(s"summaries is $summaries")
-      println(s"Query is $query")
-      query
+  def searchSubjectHeading(text: Seq[String], queryBuilder: Seq[String] => Future[String]): Future[Option[String]] = {
+    text.isEmpty match {
+      case false =>
+        val terms = text.mkString(",")
+        for {
+          ids <- callApi(s"$BASE_URL/esearch.fcgi?db=$MESH_DB_NAME&term=$terms$API_KEY", extractIdFromXml)
+          summaries <- fetchSummaryData(ids.mkString(","))
+          query <- queryBuilder(summaries)
+        } yield {
+          //      println(s"ids is $ids")
+          //      println(s"summaries is $summaries")
+          println(s"Query is $query")
+          Option(query)
+        }
+
+      case true =>
+        Future {
+          Option.empty
+        }
     }
   }
 

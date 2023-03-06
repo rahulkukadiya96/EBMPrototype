@@ -1,6 +1,7 @@
 package generator
 
 import classifier.MeSHClassifier.classifyTerms
+import dao.MeSHLoaderDao
 import generator.ExternalCallUtils.{callApi, extractIdFromXml}
 import generator.MeSHSearch.searchSubjectHeading
 import models.Pico
@@ -11,35 +12,76 @@ import scala.concurrent.Future
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
   val OR = " OR "
-  val AND = " AND "
+  val AND = " OR "
   val PUBMED_DB_NAME = "pubmed"
 
-  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
-    /*val query = buildQuery(pico)
-      val query = "cancer"
-      val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
-    */
-    for {
-      problem_terms <- classifyTerms(pico.problem.split(" "))
-      problem_search_terms <- searchSubjectHeading(problem_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  //  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
+  //    /*val query = buildQuery(pico)
+  //      val query = "cancer"
+  //      val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
+  //    */
+  //    for {
+  //      problem_terms <- classifyTerms(pico.problem.split(" "))
+  //      problem_search_terms <- searchSubjectHeading(problem_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  //
+  //      outcome_terms <- classifyTerms(pico.outcome.split(" "))
+  //      outcome_search_terms <- searchSubjectHeading(outcome_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  //
+  //      intervention_terms <- classifyTerms(pico.intervention.split(" "))
+  //      intervention_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  //
+  //      intervention_terms <- classifyTerms(pico.comparison.get.split(" "))
+  //      comparision_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  //
+  //      query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+  //
+  //      url <- buildUrl(query, retMax)
+  //      ids <- callApi(url, extractIdFromXml)
+  //    } yield {
+  //      println(s"problem_search_terms is  ${problem_search_terms}")
+  //      println(s"Final Id list is ${ids.size}")
+  //      ids
+  //    }
+  //  }
 
-      outcome_terms <- classifyTerms(pico.outcome.split(" "))
-      outcome_search_terms <- searchSubjectHeading(outcome_terms.flatten(_.subject_headings), subjectHeadingJoiner)
 
-      intervention_terms <- classifyTerms(pico.intervention.split(" "))
-      intervention_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int = 10): Future[Seq[String]] = {
+    picoD match {
+      case Some(pico) =>
+        for {
+          problem_terms <- StaticMeSHSearch.classifyTerms(pico.problem.split(" "), dao)
+          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
-      intervention_terms <- classifyTerms(pico.comparison.get.split(" "))
-      comparision_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+          outcome_terms <- StaticMeSHSearch.classifyTerms(pico.outcome.split(" "), dao)
+          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
-      query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+          intervention_terms <- StaticMeSHSearch.classifyTerms(pico.intervention.split(" "), dao)
+          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-      url <- buildUrl(query, retMax)
-      ids <- callApi(url, extractIdFromXml)
-    } yield {
-      println(s"problem_search_terms is  ${problem_search_terms}")
-      println(s"Final Id list is ${ids.size}")
-      ids
+          intervention_terms <- StaticMeSHSearch.classifyTerms(pico.comparison.get.split(" "), dao)
+          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+
+          query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+        } yield {
+          return Option(query) match {
+            case Some(queryStr) =>
+              for {
+                url <- buildUrl(queryStr, retMax)
+                ids <- callApi(url, extractIdFromXml)
+              } yield {
+                println(s"problem_search_terms is  ${problem_search_terms}")
+                println(s"Final Id list is ${ids.size}")
+                ids
+              }
+            case None => Future {
+              Seq.empty
+            }
+          }
+        }
+      case None =>
+        Future {
+          Seq.empty
+        }
     }
   }
 
@@ -92,8 +134,8 @@ object PubMedSearch {
     query
   }
 
-  private def buildQuery(patientQuery: String, interventionQuery: String, outcomeQuery: String, comparisonQuery: String): Future[String] = Future {
-    s"($patientQuery) AND ($interventionQuery) AND ($comparisonQuery) AND ($outcomeQuery)"
+  private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[String] = Future {
+    List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).mkString("(", AND, ")")
   }
 
   private def buildUrl(query: String, retMax: Int): Future[String] = Future {

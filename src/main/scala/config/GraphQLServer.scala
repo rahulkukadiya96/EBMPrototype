@@ -24,6 +24,7 @@ import scala.util.{Failure, Success}
  */
 object GraphQLServer {
   private val dao = DBSchema.createDatabase
+  private val meshLoader = DBSchema.createMeshLoader
 
   def endpoint(requestJSON: JsValue)(implicit ec: ExecutionContext): Route = {
     val JsObject(fields) = requestJSON
@@ -58,7 +59,7 @@ object GraphQLServer {
     Executor.execute(
       GraphQLSchema.schemaDefinition,
       query,
-      MyContext(dao),
+      MyContext(dao, meshLoader),
       variables = vars,
       operationName = operation,
       deferredResolver = GraphQLSchema.resolver,
