@@ -303,6 +303,18 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
+          } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
+        }
+      ),
+      Field(
+        "search",
+        OptionType(ListType(PICODataType)),
+        arguments = FetchPicoRequestArg :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val fetchPicoRequest = config.arg(FetchPicoRequestArg)
+          for {
+            patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
             data <- PubMedSearch.fetchData((transformList(fetchPicoRequest.comparison)(patientSoapList)).head, 10)
           } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
         }
