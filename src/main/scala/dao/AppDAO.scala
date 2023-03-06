@@ -5,10 +5,10 @@ import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
-import scala.collection.JavaConverters._
-import scala.compat.java8.FutureConverters
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.CollectionHasAsScala
+import scala.jdk.FutureConverters
 
 class AppDAO(connection: Driver) {
   def createPatient(patient: Patient): Future[Patient] = {
@@ -62,7 +62,7 @@ class AppDAO(connection: Driver) {
 
   def createObject(patientSoapId: Int, objective: Objective): Future[Objective] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
-    queryString = s"CREATE (objective : Objective{ vital: '${objective.vital}', labTest: '${objective.labTest}', physicalExam: '${objective.physicalExam}', diagnosticData: '${objective.diagnosticData}', createdAt : ${getTodayDateTimeNeo4j(objective.createdAt.getOrElse(getCurrentUTCTime))} }) "
+    queryString = s"CREATE (objective : Objective{ vital: '${objective.vital}', labTest: '${objective.labTest}', physicalExam: '${objective.physicalExam}', diagnosticData: '${objective.diagnosticData}', createdAt : ${getTodayDateTimeNeo4j(objective.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
 
     /*queryString += s" CREATE (patientSOAP)-[:soap_object { subId :ID(objective)  }]->(objective), "
     queryString += s" (objective)-[:patientSOAP {patientSOAPId : $patientSoapId }]->(patientSOAP) "*/
@@ -75,7 +75,7 @@ class AppDAO(connection: Driver) {
 
   def createAssessment(patientSoapId: Int, assessment: Assessment): Future[Assessment] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
-    queryString = s"CREATE (assessment : Assessment{ ddx: '${assessment.ddx}', mechanism: '${assessment.mechanism}', createdAt : ${getTodayDateTimeNeo4j(assessment.createdAt.getOrElse(getCurrentUTCTime))} }) "
+    queryString = s"CREATE (assessment : Assessment{ ddx: '${assessment.ddx}', mechanism: '${assessment.mechanism}', createdAt : ${getTodayDateTimeNeo4j(assessment.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN "
 
     /*queryString += s" CREATE (patientSOAP)-[:soap_assessment { subId :ID(assessment)  }]->(assessment), "
     queryString += s" (assessment)-[:patientSOAP {patientSOAPId : $patientSoapId }]->(patientSOAP) "*/
@@ -88,7 +88,7 @@ class AppDAO(connection: Driver) {
 
   def createPlan(patientSoapId: Int, plan: Plan): Future[Plan] = {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
-    queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) "
+    queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
 
     /*queryString += s" CREATE (patientSOAP)-[:soap_plan { subId :ID(plan)  }]->(plan), "
     queryString += s" (plan)-[:patientSOAP {patId : $patientSoapId }]->(patientSOAP) "*/
@@ -281,7 +281,7 @@ class AppDAO(connection: Driver) {
       }
       .whenComplete((_, _) => session.closeAsync())
 
-    FutureConverters.toScala(queryCompletion)
+    FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
   private def getData[T](query: String, reader: Record => T) = {
@@ -290,11 +290,11 @@ class AppDAO(connection: Driver) {
       .runAsync(query)
       .thenCompose[java.util.List[T]](c => c.listAsync[T](record => reader(record)))
       .thenApply[Seq[T]] {
-        _.asScala
+        _.asScala.toSeq
       }
       .whenComplete((_, _) => session.closeAsync())
 
-    FutureConverters.toScala(queryCompletion)
+    FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
   private def deleteNode(query: String) = connection.session().run(query).summary().counters().nodesDeleted() > 0

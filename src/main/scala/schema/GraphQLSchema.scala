@@ -1,12 +1,14 @@
 package schema
 
 import config.MyContext
+import convertor.ConvertorUtils.transformList
+import generator.PubMedSearch
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
 import sangria.macros.derive._
 import sangria.marshalling.sprayJson._
-import sangria.schema._
+import sangria.schema.{StringType, _}
 import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
@@ -30,7 +32,7 @@ object GraphQLSchema {
     "LocalDateTime", // Define the name
     coerceOutput = (localDateTime, _) => DateTimeFormatUtil.fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime).getOrElse(LocalDateTimeCoerceViolation.errorMessage),
     coerceInput = {
-      case StringValue(dt, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
+      case StringValue(dt, _, _,_,_) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
     },
     coerceUserInput = {
       case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), s)).toRight(LocalDateTimeCoerceViolation)
@@ -162,6 +164,16 @@ object GraphQLSchema {
     ReplaceField("createdAt", Field("createdAt", GraphQLDateTime, resolve = _.value.createdAt.get))
   )
 
+  private lazy val PICODataType: ObjectType[Unit, Pico] = deriveObjectType[Unit, Pico](
+    Interfaces(IdentifiableType)
+  )
+
+  implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat2(FetchPicoRequest)
+  implicit val FetchPicoRequestInputType: InputObjectType[FetchPicoRequest] = deriveInputObjectType[FetchPicoRequest](
+    InputObjectTypeName("FETCH_PICO_REQUEST_INPUT_TYPE")
+  )
+
+  private val FetchPicoRequestArg = Argument("data", FetchPicoRequestInputType)
 
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
@@ -281,6 +293,19 @@ object GraphQLSchema {
         OptionType(ListType(PatientSOAPDataType)),
         arguments = List(Ids),
         resolve = config => patientSoapDataFetcher.deferSeq(config.arg(Ids))
+      ),
+      Field(
+        "pico",
+        OptionType(ListType(PICODataType)),
+        arguments = FetchPicoRequestArg :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val fetchPicoRequest = config.arg(FetchPicoRequestArg)
+          for {
+            patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
+            data <- PubMedSearch.fetchData((transformList(fetchPicoRequest.comparison)(patientSoapList)).head, 10)
+          } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
+        }
       )
     )
   )

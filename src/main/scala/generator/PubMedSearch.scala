@@ -1,0 +1,102 @@
+package generator
+
+import classifier.MeSHClassifier.classifyTerms
+import generator.ExternalCallUtils.{callApi, extractIdFromXml}
+import generator.MeSHSearch.searchSubjectHeading
+import models.Pico
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
+object PubMedSearch {
+  val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+  val OR = " OR "
+  val AND = " AND "
+  val PUBMED_DB_NAME = "pubmed"
+
+  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
+    /*val query = buildQuery(pico)
+      val query = "cancer"
+      val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
+    */
+    for {
+      problem_terms <- classifyTerms(pico.problem.split(" "))
+      problem_search_terms <- searchSubjectHeading(problem_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      outcome_terms <- classifyTerms(pico.outcome.split(" "))
+      outcome_search_terms <- searchSubjectHeading(outcome_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      intervention_terms <- classifyTerms(pico.intervention.split(" "))
+      intervention_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      intervention_terms <- classifyTerms(pico.comparison.get.split(" "))
+      comparision_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
+
+      query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+
+      url <- buildUrl(query, retMax)
+      ids <- callApi(url, extractIdFromXml)
+    } yield {
+      println(s"problem_search_terms is  ${problem_search_terms}")
+      println(s"Final Id list is ${ids.size}")
+      ids
+    }
+  }
+
+  def subjectHeadingJoiner(seq: Seq[String]): Future[String] = Future {
+    joiner(seq, OR)
+  }
+
+  def joiner[A](seq: Seq[A], del: String): String = seq.mkString(del)
+
+  /*def searchAll(pico: Pico, email: String): Future[Seq[String]] = {
+    val retmax = 10000
+    var ids = Seq.empty[String]
+    var page = 0
+    var total = 0
+
+    def fetchDataPage(): Future[Seq[String]] = {
+      val start = page * retmax
+      val idsFuture = fetchData(pico, start, retmax, email)
+      idsFuture.flatMap { newIds =>
+        if (newIds.isEmpty || total >= retmax) {
+          Future.successful(ids)
+        } else {
+          ids ++= newIds
+          total += newIds.length
+          page += 1
+          println(s"Retrieved ${newIds.length} results on page $page")
+          fetchDataPage()
+        }
+      }
+    }
+
+    fetchDataPage().map { _ =>
+      println(s"Retrieved a total of $total results")
+      ids
+    }
+  }*/
+
+  private def buildQuery(pico: Pico): String = {
+    val patientTerms = pico.problem.split("\\s+").map(_.toLowerCase)
+    val interventionTerms = pico.intervention.split("\\s+").map(_.toLowerCase)
+    val comparisonTerms = pico.comparison.get.split("\\s+").map(_.toLowerCase)
+    val outcomeTerms = pico.outcome.split("\\s+").map(_.toLowerCase)
+
+    val patientQuery = patientTerms.mkString(" OR ")
+    val interventionQuery = interventionTerms.mkString(" OR ")
+    val comparisonQuery = comparisonTerms.mkString(" OR ")
+    val outcomeQuery = outcomeTerms.mkString(" OR ")
+
+    val query = s"$patientQuery AND $interventionQuery AND $comparisonQuery AND $outcomeQuery"
+    query
+  }
+
+  private def buildQuery(patientQuery: String, interventionQuery: String, outcomeQuery: String, comparisonQuery: String): Future[String] = Future {
+    s"($patientQuery) AND ($interventionQuery) AND ($comparisonQuery) AND ($outcomeQuery)"
+  }
+
+  private def buildUrl(query: String, retMax: Int): Future[String] = Future {
+    s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=$query&retmax=$retMax"
+  }
+}
