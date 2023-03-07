@@ -170,7 +170,7 @@ object GraphQLSchema {
 
   private lazy val ResponseDataType: ObjectType[Unit, Response] = deriveObjectType[Unit, Response]()
 
-  implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat2(FetchPicoRequest)
+  implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat3(FetchPicoRequest)
   implicit val FetchPicoRequestInputType: InputObjectType[FetchPicoRequest] = deriveInputObjectType[FetchPicoRequest](
     InputObjectTypeName("FETCH_PICO_REQUEST_INPUT_TYPE")
   )
@@ -318,7 +318,7 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, 10)
+            data <- fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, fetchPicoRequest.limit.getOrElse(10))
           } yield data
         }
       )

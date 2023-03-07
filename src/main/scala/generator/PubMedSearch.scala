@@ -14,7 +14,7 @@ object PubMedSearch {
   val AND = " AND "
   val PUBMED_DB_NAME = "pubmed"
 
-  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int = 10): Future[Response] = {
+  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int): Future[Response] = {
     picoD match {
       case Some(pico) =>
         for {
