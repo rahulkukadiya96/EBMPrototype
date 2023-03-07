@@ -11,11 +11,13 @@ import spray.json.JsValue
 import scala.concurrent.Await
 import scala.language.postfixOps
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import com.typesafe.config.{Config, ConfigFactory}
 
 object Application extends App {
   val PORT = 18089
+  val applicationConf: Config = ConfigFactory.load("application.conf")
 
-  implicit val actorSystem = ActorSystem("graphql-server")
+  implicit val actorSystem = ActorSystem("graphql-server", applicationConf)
   implicit val materializer = ActorMaterializer()
 
   import actorSystem.dispatcher

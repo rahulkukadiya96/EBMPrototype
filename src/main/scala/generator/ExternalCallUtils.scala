@@ -11,13 +11,10 @@ import scala.xml.Elem
 
 object ExternalCallUtils {
   def callApi[A](url: String, processor: Elem => Seq[A]): Future[Seq[A]] = Future {
-    println(s"URL for endpoint is $url")
     Using(Source.fromURL(url)) {
       data =>
         try {
-          print(s"data is $data")
           val xml = CustomXMLParser.loadString(data.mkString)
-          println(s"Generated xml is $xml")
           processor(xml)
         } catch {
           case e: Exception =>
