@@ -2,7 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import generator.PubMedSearch
+import generator.PubMedSearch.fetchDataWithStaticClassifier
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
@@ -318,8 +318,8 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- PubMedSearch.fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, 10)
-          } yield Response(data.mkString(","), 200)
+            data <- fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, 10)
+          } yield data
         }
       )
     )

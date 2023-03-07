@@ -3,7 +3,7 @@ package generator
 import dao.MeSHLoaderDao
 import generator.ExternalCallUtils.{callApi, extractIdFromXml, urlEncode}
 import generator.MeSHSearch.searchSubjectHeading
-import models.Pico
+import models.{Pico, Response}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -14,7 +14,7 @@ object PubMedSearch {
   val AND = " AND "
   val PUBMED_DB_NAME = "pubmed"
 
-  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int = 10): Future[Seq[String]] = {
+  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int = 10): Future[Response] = {
     picoD match {
       case Some(pico) =>
         for {
@@ -31,25 +31,35 @@ object PubMedSearch {
           comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
           query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+          response <- executeQuery(query, retMax)
         } yield {
-          return query match {
-            case Some(queryStr) =>
-              for {
-                url <- buildUrl(queryStr, retMax)
-                ids <- callApi(url, extractIdFromXml)
-              } yield {
-                ids
-              }
-            case None => Future {
-              Seq.empty
-            }
-          }
+          response
         }
       case None =>
         Future {
-          Seq.empty
+          Response("No data found", 200)
         }
     }
+  }
+
+  def executeQuery(query: Option[String], retMax: Int) = {
+    query match {
+      case Some(queryStr) =>
+        for {
+          url <- buildUrl(queryStr, retMax)
+          ids <- callApi(url, extractIdFromXml)
+          response <- buildResponseObject(ids)
+        } yield {
+          response
+        }
+      case None => Future {
+        Response("No data found", 200)
+      }
+    }
+  }
+
+  def buildResponseObject(ids: Seq[String]): Future[Response] = Future {
+    Response(ids.mkString(","), 200)
   }
 
   def subjectHeadingJoiner(seq: Seq[String]): Future[String] = Future {
@@ -105,7 +115,7 @@ object PubMedSearch {
     val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).filter(_.nonEmpty)
     queryList.isEmpty match {
       case true => Option.empty
-      case false => Option(queryList.map("(" +_+ ")").mkString("(",AND, ")"))
+      case false => Option(queryList.map("(" + _ + ")").mkString("(", AND, ")"))
     }
   }
 
