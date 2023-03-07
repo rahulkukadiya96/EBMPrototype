@@ -1,7 +1,7 @@
 package generator
 
 import dao.MeSHLoaderDao
-import generator.ExternalCallUtils.{callApi, extractIdFromXml}
+import generator.ExternalCallUtils.{callApi, extractIdFromXml, urlEncode}
 import generator.MeSHSearch.searchSubjectHeading
 import models.Pico
 
@@ -11,38 +11,8 @@ import scala.concurrent.Future
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
   val OR = " OR "
-  val AND = " OR "
+  val AND = " AND "
   val PUBMED_DB_NAME = "pubmed"
-
-  //  def fetchData(pico: Pico, retMax: Int, email: String = "rkukadiy@lakeheadu.ca"): Future[Seq[String]] = {
-  //    /*val query = buildQuery(pico)
-  //      val query = "cancer"
-  //      val url = s"$BASE_URL/esearch.fcgi?db=pubmed&term=$query&retmax=$retMax"
-  //    */
-  //    for {
-  //      problem_terms <- classifyTerms(pico.problem.split(" "))
-  //      problem_search_terms <- searchSubjectHeading(problem_terms.flatten(_.subject_headings), subjectHeadingJoiner)
-  //
-  //      outcome_terms <- classifyTerms(pico.outcome.split(" "))
-  //      outcome_search_terms <- searchSubjectHeading(outcome_terms.flatten(_.subject_headings), subjectHeadingJoiner)
-  //
-  //      intervention_terms <- classifyTerms(pico.intervention.split(" "))
-  //      intervention_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
-  //
-  //      intervention_terms <- classifyTerms(pico.comparison.get.split(" "))
-  //      comparision_search_terms <- searchSubjectHeading(intervention_terms.flatten(_.subject_headings), subjectHeadingJoiner)
-  //
-  //      query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
-  //
-  //      url <- buildUrl(query, retMax)
-  //      ids <- callApi(url, extractIdFromXml)
-  //    } yield {
-  //      println(s"problem_search_terms is  ${problem_search_terms}")
-  //      println(s"Final Id list is ${ids.size}")
-  //      ids
-  //    }
-  //  }
-
 
   def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int = 10): Future[Seq[String]] = {
     picoD match {
@@ -68,7 +38,6 @@ object PubMedSearch {
                 url <- buildUrl(queryStr, retMax)
                 ids <- callApi(url, extractIdFromXml)
               } yield {
-                println(s"problem_search_terms is  ${problem_search_terms}")
                 println(s"Final Id list is ${ids.size}")
                 ids
               }
@@ -134,14 +103,14 @@ object PubMedSearch {
   }
 
   private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[Option[String]] = Future {
-    val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get)
+    val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).filter(_.nonEmpty)
     queryList.isEmpty match {
       case true => Option.empty
-      case false => Option(queryList.mkString("(", AND, ")"))
+      case false => Option(queryList.map("(" +_+ ")").mkString("(",AND, ")"))
     }
   }
 
   private def buildUrl(query: String, retMax: Int): Future[String] = Future {
-    s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=$query&retmax=$retMax"
+    s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=${urlEncode(query)}&retmax=$retMax"
   }
 }

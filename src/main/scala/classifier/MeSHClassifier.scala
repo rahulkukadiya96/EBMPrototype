@@ -1,6 +1,6 @@
 package classifier
 
-import generator.ExternalCallUtils.callApi
+import generator.ExternalCallUtils.{callApi, urlEncode}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -49,9 +49,5 @@ object MeSHClassifier {
   def processMeshResult(result: Seq[MeSHResult]): Future[SearchTerms] = Future {
     val (headings, keywords) = result.partition(_.isMeSH)
     SearchTerms(headings.map(_.term), keywords.map(_.term))
-  }
-
-  private def urlEncode(term: String): String = {
-    java.net.URLEncoder.encode(term, "UTF-8")
   }
 }
