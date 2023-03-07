@@ -38,7 +38,6 @@ object PubMedSearch {
                 url <- buildUrl(queryStr, retMax)
                 ids <- callApi(url, extractIdFromXml)
               } yield {
-                println(s"Final Id list is ${ids.size}")
                 ids
               }
             case None => Future {

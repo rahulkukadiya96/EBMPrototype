@@ -12,7 +12,6 @@ object StaticMeSHSearch {
       subjectHeadingList <- dao.getTerms(terms)
       (subjectHeading, keywords) <- classifyTerms(terms, subjectHeadingList)
     } yield {
-//      println(s"Keyword List is $keywords")
       SearchTerms(keywords, subjectHeading)
     }
   }

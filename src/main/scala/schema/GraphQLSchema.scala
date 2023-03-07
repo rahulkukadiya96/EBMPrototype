@@ -168,6 +168,8 @@ object GraphQLSchema {
     Interfaces(IdentifiableType)
   )
 
+  private lazy val ResponseDataType: ObjectType[Unit, Response] = deriveObjectType[Unit, Response]()
+
   implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat2(FetchPicoRequest)
   implicit val FetchPicoRequestInputType: InputObjectType[FetchPicoRequest] = deriveInputObjectType[FetchPicoRequest](
     InputObjectTypeName("FETCH_PICO_REQUEST_INPUT_TYPE")
@@ -308,15 +310,16 @@ object GraphQLSchema {
       ),
       Field(
         "search",
-        OptionType(ListType(PICODataType)),
+        OptionType(ResponseDataType),
         arguments = FetchPicoRequestArg :: Nil,
         resolve = config => {
           val dao = config.ctx.dao
+          val meSHLoaderDao = config.ctx.meSHLoader
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- PubMedSearch.fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, config.ctx.meSHLoader, 10)
-          } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
+            data <- PubMedSearch.fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, 10)
+          } yield Response(data.mkString(","), 200)
         }
       )
     )
