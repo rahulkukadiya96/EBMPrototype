@@ -15,6 +15,7 @@ object ExternalCallUtils {
       data =>
         try {
           val xml = CustomXMLParser.loadString(data.mkString)
+          println(s"Response XML is $xml")
           processor(xml)
         } catch {
           case e: Exception =>

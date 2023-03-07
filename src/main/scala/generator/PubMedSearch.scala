@@ -19,18 +19,22 @@ object PubMedSearch {
       case Some(pico) =>
         for {
           problem_terms <- StaticMeSHSearch.classifyTerms(pico.problem.split(" "), dao)
-          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
+          problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
+//          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
           outcome_terms <- StaticMeSHSearch.classifyTerms(pico.outcome.split(" "), dao)
-          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
+          outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
+//          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
           intervention_terms <- StaticMeSHSearch.classifyTerms(pico.intervention.split(" "), dao)
-          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+          intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
+//          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
           intervention_terms <- StaticMeSHSearch.classifyTerms(pico.comparison.get.split(" "), dao)
-          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+          comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
+//          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-          query <- buildQuery(problem_search_terms, outcome_search_terms, intervention_search_terms, comparision_search_terms)
+          query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
           response <- executeQuery(query, retMax)
         } yield {
           response
