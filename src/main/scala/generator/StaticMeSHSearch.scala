@@ -1,7 +1,7 @@
 package generator
 
-import classifier.SearchTerms
 import dao.{DescriptorName, MeSHLoaderDao}
+import models.SearchTerms
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

@@ -10,7 +10,7 @@ import scala.util.Using
 import scala.xml.Elem
 
 object ExternalCallUtils {
-  def callApi[A](url: String, processor: Elem => Seq[A]): Future[Seq[A]] = Future {
+  def callApi[A](url: String, processor: Elem => Future[Seq[A]]): Future[Seq[A]] = {
     Using(Source.fromURL(url)) {
       data =>
         try {
@@ -19,14 +19,18 @@ object ExternalCallUtils {
         } catch {
           case e: Exception =>
             e.printStackTrace()
-            Seq.empty
+            Future {
+              Seq.empty
+            }
         }
     }.getOrElse {
-      Seq.empty
+      Future {
+        Seq.empty
+      }
     }
   }
 
-  def extractIdFromXml(xml: Elem): Seq[String] = {
+  def extractIdFromXml(xml: Elem): Future[Seq[String]] = Future {
     val ids = (xml \\ "IdList" \\ "Id").map(_.text)
     ids
   }

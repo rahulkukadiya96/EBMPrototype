@@ -40,7 +40,7 @@ object MeSHSearch {
     }
   }
 
-  def extractHeadingFromXml(xml: Elem): Seq[String] = {
+  def extractHeadingFromXml(xml: Elem): Future[Seq[String]] = Future {
     val value = (xml \\ "Item").filter(item => (item \@ "Name") == "DS_MeshTerms").flatMap(_.child).map(_.text.trim).filter(_.nonEmpty).flatMap(_.split(",").toSeq)
     value
   }
