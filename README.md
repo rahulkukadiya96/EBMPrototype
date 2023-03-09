@@ -72,9 +72,19 @@ So, Ideally query would be (P1 OR P2 OR P3) and (I1 or I2) and (C1 or C2) and (O
 # Query Filter
 This is used to narrow down the results. It includes some basic filter like publication date, species article type etc.
 
+# Database Configuration
+1) Neo4J : A Graph database to store the SOAP. I used the 3.5 community edition which is worked on the JDK 8.
+2) Basic commands are, 
+   * Install Neo4J Service (neo4j install-service)
+   * Start the Service (neo4j start)
+   * Uninstall the Service (neo4j uninstall-service)
+   * Update the Service (neo4j update-service)
+
+
 # Resources
 1) https://index.scala-lang.org/bmc/grizzled-slf4j/artifacts/grizzled-slf4j
 2) https://devlms.com/graphql-scala/8-mutations/
 3) https://stackoverflow.com/questions/25178108/converting-datetime-to-a-json-string
 4) https://www.cebm.ox.ac.uk/resources/ebm-tools/finding-the-evidence-tutorial
 5) https://www.ciap.health.nsw.gov.au/training/ebp-learning-modules/
+6) https://neo4j.com/docs/operations-manual/3.5/installation/windows/
