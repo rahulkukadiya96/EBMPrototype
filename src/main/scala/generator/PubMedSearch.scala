@@ -2,9 +2,9 @@ package generator
 
 import dao.MeSHLoaderDao
 import generator.ExternalCallUtils.{callApi, extractIdFromXml, urlEncode}
-import generator.MeSHSearch.searchSubjectHeading
 import models.{Pico, Response}
 
+import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -41,7 +41,7 @@ object PubMedSearch {
         }
       case None =>
         Future {
-          Response("No data found", 200)
+          Response(empty, 200, Option("No data found"), empty)
         }
     }
   }
@@ -52,18 +52,18 @@ object PubMedSearch {
         for {
           url <- buildUrl(queryStr, retMax)
           ids <- callApi(url, extractIdFromXml)
-          response <- buildResponseObject(ids)
+          response <- buildResponseObject(ids, queryStr)
         } yield {
           response
         }
       case None => Future {
-        Response("No data found", 200)
+        Response(empty, 200, Option("No data found"), empty)
       }
     }
   }
 
-  def buildResponseObject(ids: Seq[String]): Future[Response] = Future {
-    Response(ids.mkString(","), 200)
+  def buildResponseObject(ids: Seq[String], query : String): Future[Response] = Future {
+    Response(Option(ids.flatMap(_.toIntOption)), 200, Option("Success"), Option(query))
   }
 
   def subjectHeadingJoiner(seq: Seq[String]): Future[String] = Future {
@@ -118,7 +118,7 @@ object PubMedSearch {
   private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[Option[String]] = Future {
     val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).filter(_.nonEmpty)
     queryList.isEmpty match {
-      case true => Option.empty
+      case true => empty
       case false => Option(queryList.map("(" + _ + ")").mkString("(", AND, ")"))
     }
   }
