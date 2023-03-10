@@ -2,7 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import generator.PubMedSearch.fetchDataWithStaticClassifier
+import generator.PubMedSearch.{executeQuery, fetchDataWithStaticClassifier}
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
@@ -23,7 +23,8 @@ object GraphQLSchema {
 
   private val Id = Argument("id", IntType)
   private val Ids = Argument("ids", ListInputType(IntType))
-
+  private val Query = Argument("query", StringType)
+  private val Limit = Argument("limit", IntType)
 
   /**
    * conversions between custom data type (LocalDateTime) and type Sangria understand and then back again to custom type.
@@ -32,7 +33,7 @@ object GraphQLSchema {
     "LocalDateTime", // Define the name
     coerceOutput = (localDateTime, _) => DateTimeFormatUtil.fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime).getOrElse(LocalDateTimeCoerceViolation.errorMessage),
     coerceInput = {
-      case StringValue(dt, _, _,_,_) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
+      case StringValue(dt, _, _, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
     },
     coerceUserInput = {
       case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), s)).toRight(LocalDateTimeCoerceViolation)
@@ -319,6 +320,16 @@ object GraphQLSchema {
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
             data <- fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, fetchPicoRequest.limit.getOrElse(10))
+          } yield data
+        }
+      ),
+      Field(
+        "runQuery",
+        OptionType(ResponseDataType),
+        arguments = Query :: Limit :: Nil,
+        resolve = config => {
+          for {
+            data <- executeQuery(Option(config.arg(Query)), config.arg(Limit))
           } yield data
         }
       )
