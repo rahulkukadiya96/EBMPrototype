@@ -310,6 +310,16 @@ object GraphQLSchema {
         }
       ),
       Field(
+        "fetch_pico",
+        OptionType(ListType(PICODataType)),
+        arguments = Id :: Nil,
+        resolve = config => {
+          for {
+            picoData <- config.ctx.dao.getPicoDataBySoapId(config.arg(Id))
+          } yield picoData
+        }
+      ),
+      Field(
         "search",
         OptionType(ResponseDataType),
         arguments = FetchPicoRequestArg :: Nil,
@@ -381,12 +391,17 @@ object GraphQLSchema {
     InputObjectTypeName("PLAN_INPUT_TYPE")
   )
 
+  implicit val PicoDataInputType : InputObjectType[Pico] = deriveInputObjectType[Pico](
+    InputObjectTypeName("PICO_INPUT_TYPE")
+  )
+
 
   implicit val ccEncFormat: RootJsonFormat[CCEncounter] = jsonFormat4(CCEncounter)
   implicit val PatientMedicalHistoryFormat: RootJsonFormat[PatientMedicalHistory] = jsonFormat7(PatientMedicalHistory)
   implicit val ObjectiveFormat: RootJsonFormat[Objective] = jsonFormat6(Objective)
   implicit val AssessmentFormat: RootJsonFormat[Assessment] = jsonFormat4(Assessment)
   implicit val PlanFormat: RootJsonFormat[Plan] = jsonFormat6(Plan)
+  implicit val PicoFormat: RootJsonFormat[Pico] = jsonFormat7(Pico)
 
 
   implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
@@ -394,6 +409,7 @@ object GraphQLSchema {
   private val ObjectiveDataArg = Argument("objectNodeData", ObjectiveDataInputType)
   private val AssessmentDataArg = Argument("assessmentNodeData", AssessmentDataInputType)
   private val PlanDataArg = Argument("planNodeData", PlanDataInputType)
+  private val PicoDataArg = Argument("pico", PicoDataInputType)
 
   private val PatientIdArg = Argument("patientId", IntType)
   private val SoapPatientIdArg = Argument("soapId", IntType)
@@ -481,6 +497,32 @@ object GraphQLSchema {
         arguments = MeshPathArg :: Nil,
         tags = Authorized :: Nil,
         resolve = c => c.ctx.meSHLoader.loadDictionary(c.arg(MeshPathArg))
+      ),
+
+      Field("create_pico",
+        PICODataType,
+        arguments = SoapPatientIdArg :: PicoDataArg :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val pico = c.arg(PicoDataArg)
+          val soapId = c.arg(SoapPatientIdArg)
+          for {
+            pico <- dao.createPico(pico)
+            isRelationCreated <- dao.buildRelationSoapPico(soapId, pico.id)
+          } yield pico
+        }
+      ),
+
+      Field("update_pico",
+        PICODataType,
+        arguments = PicoDataArg :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val pico = c.arg(PicoDataArg)
+          for {
+            pico <- dao.updatePico(pico)
+          } yield pico
+        }
       ),
 
       /*Field("updatePatientSOAP",

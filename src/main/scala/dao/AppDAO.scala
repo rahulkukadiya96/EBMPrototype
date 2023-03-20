@@ -132,6 +132,29 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readPatientSoapCreatedNode)
   }
 
+  private val returnPicoGenQuery = s" ID(pico) as picoId, pico.problem as problem, pico.intervention as intervention, pico.comparison as comparison, pico.outcome as outcome,pico.timePeriod as timePeriod, pico.createdAt as picoCreatedAt"
+
+  def createPico(pico: Pico): Future[Pico] = {
+    var queryString = s"CREATE (pico : Pico{ problem: '${pico.problem}', intervention: '${pico.intervention}', comparison: '${pico.comparison.getOrElse("")}', outcome: '${pico.outcome}', timePeriod: '${pico.timePeriod.getOrElse("")}', createdAt : ${getTodayDateTimeNeo4j(pico.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+  def buildRelationSoapPico(soapNodeId : Int, picoId : Int) = Future {
+    var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
+    queryString += s"MATCH (pico: Pico) WHERE ID(pico) = $picoId "
+
+    queryString += s" CREATE (patientSOAP)-[:soap_pico { picoId :$picoId}]->(pico), "
+    queryString += s" (pico)-[:pico_soap {patientSOAPId : $soapNodeId }]->(patientSOAP) "
+    connection.session().run(queryString)
+    true
+  }
+
+  def updatePico(pico: Pico): Future[Pico] = {
+    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = ${pico.id}  SET pico.problem = '${pico.problem}', pico.intervention = '${pico.intervention}', pico.comparison = '${pico.comparison.getOrElse("")}', pico.timePeriod = '${pico.timePeriod.getOrElse("")}', pico.outcome = '${pico.outcome}' RETURN"
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+
 
   /* Patient methods */
 
@@ -261,6 +284,11 @@ class AppDAO(connection: Driver) {
     queryString += returnAssessmentGenQuery + ","
     queryString += returnPlanGenQuery
     getData(queryString, readPatientSoapNode)
+  }
+
+  def getPicoDataBySoapId(soapId: Int): Future[Seq[Pico]] = {
+    val queryString = s"MATCH (pico : Pico)-[k:pico_soap]->(patientSOAP:Patient_SOAP) WHERE k.patientSOAPId =$soapId RETURN " + returnPicoGenQuery
+    getData(queryString, readPico)
   }
 
 
@@ -408,6 +436,19 @@ class AppDAO(connection: Driver) {
       assessment = readAssessment(record),
       plan = readPlan(record),
       createdAt = Some(record.get("soapCreatedAt").asLocalDateTime())
+    )
+  }
+
+
+  private def readPico(record: Record): Pico = {
+    Pico(
+      id = record.get("picoId").asInt(),
+      problem = record.get("problem").asString(),
+      intervention = record.get("intervention").asString(),
+      comparison = Option(record.get("comparison").asString()),
+      outcome = record.get("outcome").asString(),
+      createdAt = Option(record.get("picoCreatedAt").asLocalDateTime()),
+      timePeriod = Option(record.get("timePeriod").asString())
     )
   }
 }
