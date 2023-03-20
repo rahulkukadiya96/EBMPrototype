@@ -139,7 +139,7 @@ class AppDAO(connection: Driver) {
     queryString += returnPicoGenQuery
     writeData(queryString, readPico)
   }
-  def buildRelationSoapPico(soapNodeId : Int, picoId : Int) = Future {
+  def buildRelationSoapPico(soapNodeId : Int, picoId : Int): Future[Boolean] = Future {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
     queryString += s"MATCH (pico: Pico) WHERE ID(pico) = $picoId "
 

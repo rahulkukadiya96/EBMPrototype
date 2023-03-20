@@ -328,8 +328,9 @@ object GraphQLSchema {
           val meSHLoaderDao = config.ctx.meSHLoader
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
-            patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- fetchDataWithStaticClassifier(transformList(fetchPicoRequest.comparison)(patientSoapList).headOption, meSHLoaderDao, fetchPicoRequest.limit.getOrElse(10))
+            /*patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)*/
+            pico <- dao.getPicoDataBySoapId(fetchPicoRequest.ids.head)
+            data <- fetchDataWithStaticClassifier(pico.headOption, meSHLoaderDao, fetchPicoRequest.limit.getOrElse(10))
           } yield data
         }
       ),

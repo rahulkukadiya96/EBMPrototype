@@ -2,6 +2,7 @@ package generator
 
 import dao.MeSHLoaderDao
 import generator.ExternalCallUtils.{callApi, extractIdFromXml, urlEncode}
+import generator.StaticMeSHSearch.classifyTerms
 import models.{Pico, Response}
 
 import scala.Option.empty
@@ -18,19 +19,19 @@ object PubMedSearch {
     picoD match {
       case Some(pico) =>
         for {
-          problem_terms <- StaticMeSHSearch.classifyTerms(pico.problem.split(" "), dao)
+          problem_terms <- classifyTerms(pico.problem.split(" "), dao)
           problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
 //          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
-          outcome_terms <- StaticMeSHSearch.classifyTerms(pico.outcome.split(" "), dao)
+          outcome_terms <- classifyTerms(pico.outcome.split(" "), dao)
           outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
 //          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
-          intervention_terms <- StaticMeSHSearch.classifyTerms(pico.intervention.split(" "), dao)
+          intervention_terms <- classifyTerms(pico.intervention.split(" "), dao)
           intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
 //          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-          intervention_terms <- StaticMeSHSearch.classifyTerms(pico.comparison.get.split(" "), dao)
+          intervention_terms <- classifyTerms(pico.comparison.getOrElse("").split(" "), dao)
           comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
 //          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
