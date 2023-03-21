@@ -88,12 +88,7 @@ class AppDAO(connection: Driver) {
   private val returnPlanGenQuery = s" ID(plan) as planId, plan.indication as indication, plan.management as management, plan.summary as summary, plan.followup as followup, plan.createdAt as planCreatedAt"
 
   def createPlan(patientSoapId: Int, plan: Plan): Future[Plan] = {
-    var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
-    queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
-
-    /*queryString += s" CREATE (patientSOAP)-[:soap_plan { subId :ID(plan)  }]->(plan), "
-    queryString += s" (plan)-[:patientSOAP {patId : $patientSoapId }]->(patientSOAP) "*/
-
+    var queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
     queryString += returnPlanGenQuery
     writeData(queryString, readPlan)
   }
@@ -141,7 +136,7 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readPico)
   }
 
-  def buildRelationSoapPico(soapNodeId : Int, picoId : Int): Future[Boolean] = Future {
+  def buildRelationSoapPico(soapNodeId: Int, picoId: Int): Future[Boolean] = Future {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
     queryString += s"MATCH (pico: Pico) WHERE ID(pico) = $picoId "
 
@@ -161,7 +156,7 @@ class AppDAO(connection: Driver) {
     var session = connection.session()
     try {
       val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
-        " CREATE (pico) -[:HAS_ARTICLE]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
+        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
       articles.map(article => {
         val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate)
         session.run(createArticleQuery, params.asJava)
@@ -169,6 +164,16 @@ class AppDAO(connection: Driver) {
     } catch {
       case e: Exception =>
         e.printStackTrace()
+    } finally {
+      session.close()
+    }
+  }
+
+  def removeAllArticles(picoId: Int): Unit = {
+    val query = s"MATCH (p:Pico)-[r:HAS_ARTICLE]->(a:Article) WHERE r.picoId = $picoId DETACH DELETE a "
+    val session = connection.session()
+    try {
+      session.run(query)
     } finally {
       session.close()
     }
@@ -330,19 +335,6 @@ class AppDAO(connection: Driver) {
     FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
-  private def writeData[T](query: String, paramMap: Map[String, Object], reader: Record => T) = {
-    val session = connection.session()
-    val queryCompletion = session
-      .runAsync(query, mapAsJavaMapConverter(paramMap).asJava)
-      .thenCompose[java.util.List[T]](c => c.listAsync[T](r => reader(r)))
-      .thenApply[T] {
-        _.asScala.head
-      }
-      .whenComplete((_, _) => session.closeAsync())
-
-    FutureConverters.CompletionStageOps(queryCompletion).asScala
-  }
-
   private def getData[T](query: String, reader: Record => T) = {
     val session = connection.session()
     val queryCompletion = session
@@ -483,7 +475,7 @@ class AppDAO(connection: Driver) {
     )
   }
 
-  private def readArticle(record: Record) : Article = {
+  private def readArticle(record: Record): Article = {
     Article(
       id = Option(record.get("articleId").asLong()),
       title = record.get("title").asString(),

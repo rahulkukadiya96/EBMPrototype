@@ -102,6 +102,8 @@ object PubMedSearch {
               totalPages <- totalPages(recordCount, pageSize)
               additionParam <- fetchAdditionalParams(encodedQuery, pageSize)
             } yield {
+              // Remove existing articles
+              appDao.removeAllArticles(picoVal.id)
               /*val articles = (1 to totalPages).map(_ => fetchRecord(encodedQuery, picoVal.id, appDao, _, pageSize))*/
               for (pageNo <- 1 to 2) {
                 fetchRecord(additionParam, picoVal.id, appDao, pageNo, pageSize)
