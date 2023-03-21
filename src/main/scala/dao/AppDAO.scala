@@ -5,6 +5,7 @@ import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.time.LocalDateTime
+import scala.collection.JavaConverters.mapAsJavaMapConverter
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -139,6 +140,7 @@ class AppDAO(connection: Driver) {
     queryString += returnPicoGenQuery
     writeData(queryString, readPico)
   }
+
   def buildRelationSoapPico(soapNodeId : Int, picoId : Int): Future[Boolean] = Future {
     var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
     queryString += s"MATCH (pico: Pico) WHERE ID(pico) = $picoId "
@@ -155,6 +157,22 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readPico)
   }
 
+  def saveArticles(picoId: Int, articles: Seq[Article]): Unit = {
+    var session = connection.session()
+    try {
+      val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
+        " CREATE (pico) -[:HAS_ARTICLE]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
+      articles.map(article => {
+        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate)
+        session.run(createArticleQuery, params.asJava)
+      })
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+    } finally {
+      session.close()
+    }
+  }
 
   /* Patient methods */
 
@@ -312,6 +330,19 @@ class AppDAO(connection: Driver) {
     FutureConverters.CompletionStageOps(queryCompletion).asScala
   }
 
+  private def writeData[T](query: String, paramMap: Map[String, Object], reader: Record => T) = {
+    val session = connection.session()
+    val queryCompletion = session
+      .runAsync(query, mapAsJavaMapConverter(paramMap).asJava)
+      .thenCompose[java.util.List[T]](c => c.listAsync[T](r => reader(r)))
+      .thenApply[T] {
+        _.asScala.head
+      }
+      .whenComplete((_, _) => session.closeAsync())
+
+    FutureConverters.CompletionStageOps(queryCompletion).asScala
+  }
+
   private def getData[T](query: String, reader: Record => T) = {
     val session = connection.session()
     val queryCompletion = session
@@ -449,6 +480,16 @@ class AppDAO(connection: Driver) {
       outcome = record.get("outcome").asString(),
       createdAt = Option(record.get("picoCreatedAt").asLocalDateTime()),
       timePeriod = Option(record.get("timePeriod").asString())
+    )
+  }
+
+  private def readArticle(record: Record) : Article = {
+    Article(
+      id = Option(record.get("articleId").asLong()),
+      title = record.get("title").asString(),
+      authors = record.get("authors").asString(),
+      journal = record.get("journal").asString(),
+      pubDate = record.get("pubDate").asString(),
     )
   }
 }

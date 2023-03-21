@@ -39,4 +39,12 @@ object ExternalCallUtils {
   def urlEncode(query: String): String = {
     encode(query, "UTF-8")
   }
+
+  def extractCountFromXml(xml: Elem): Future[Seq[Int]] = Future {
+    val totalCount = (xml \ "Count").text.toIntOption
+    totalCount match {
+      case Some(value) => Seq(value)
+      case None => Seq.empty
+    }
+  }
 }

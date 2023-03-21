@@ -1,21 +1,25 @@
 package generator
 
-import dao.MeSHLoaderDao
-import generator.ExternalCallUtils.{callApi, extractIdFromXml, urlEncode}
+import dao.{AppDAO, MeSHLoaderDao}
+import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
 import generator.StaticMeSHSearch.classifyTerms
-import models.{Pico, Response}
+import models.{Article, Pico, Response}
+import schema.DBSchema.config
 
 import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.xml.{Elem, Node}
 
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
   val OR = " OR "
   val AND = " AND "
   val PUBMED_DB_NAME = "pubmed"
+  val API_KEY: String = config.getString("ncbi_api_key")
+  val API_EMAIL: String = config.getString("ncbi_email")
 
-  def fetchDataWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, retMax: Int): Future[Response] = {
+  def buildQueryWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao): Future[Option[String]] = {
     picoD match {
       case Some(pico) =>
         for {
@@ -36,13 +40,14 @@ object PubMedSearch {
 //          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
           query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
-          response <- executeQuery(query, retMax)
+          /*response <- executeQuery(query, retMax)*/
         } yield {
-          response
+          query
         }
       case None =>
         Future {
-          Response(empty, 200, Option("No data found"), empty)
+          None
+          /*Response(empty, 200, Option("No data found"), empty)*/
         }
     }
   }
@@ -73,49 +78,6 @@ object PubMedSearch {
 
   def joiner[A](seq: Seq[A], del: String): String = seq.mkString(del)
 
-  /*def searchAll(pico: Pico, email: String): Future[Seq[String]] = {
-    val retmax = 10000
-    var ids = Seq.empty[String]
-    var page = 0
-    var total = 0
-
-    def fetchDataPage(): Future[Seq[String]] = {
-      val start = page * retmax
-      val idsFuture = fetchData(pico, start, retmax, email)
-      idsFuture.flatMap { newIds =>
-        if (newIds.isEmpty || total >= retmax) {
-          Future.successful(ids)
-        } else {
-          ids ++= newIds
-          total += newIds.length
-          page += 1
-          println(s"Retrieved ${newIds.length} results on page $page")
-          fetchDataPage()
-        }
-      }
-    }
-
-    fetchDataPage().map { _ =>
-      println(s"Retrieved a total of $total results")
-      ids
-    }
-  }*/
-
-  private def buildQuery(pico: Pico): String = {
-    val patientTerms = pico.problem.split("\\s+").map(_.toLowerCase)
-    val interventionTerms = pico.intervention.split("\\s+").map(_.toLowerCase)
-    val comparisonTerms = pico.comparison.get.split("\\s+").map(_.toLowerCase)
-    val outcomeTerms = pico.outcome.split("\\s+").map(_.toLowerCase)
-
-    val patientQuery = patientTerms.mkString(" OR ")
-    val interventionQuery = interventionTerms.mkString(" OR ")
-    val comparisonQuery = comparisonTerms.mkString(" OR ")
-    val outcomeQuery = outcomeTerms.mkString(" OR ")
-
-    val query = s"$patientQuery AND $interventionQuery AND $comparisonQuery AND $outcomeQuery"
-    query
-  }
-
   private def buildQuery(patientQuery: Option[String], interventionQuery: Option[String], outcomeQuery: Option[String], comparisonQuery: Option[String]): Future[Option[String]] = Future {
     val queryList = List(patientQuery, interventionQuery, outcomeQuery, comparisonQuery).filter(_.isDefined).map(_.get).filter(_.nonEmpty)
     queryList.isEmpty match {
@@ -126,5 +88,85 @@ object PubMedSearch {
 
   private def buildUrl(query: String, retMax: Int): Future[String] = Future {
     s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=${urlEncode(query)}&retmax=$retMax"
+  }
+
+  def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO) = {
+    val pageSize = 25
+    query match {
+      case Some(queryStr) =>
+        pico match {
+          case Some(picoVal) =>
+            val encodedQuery= urlEncode(queryStr)
+            for {
+              recordCount <- fetchCounts(encodedQuery)
+              totalPages <- totalPages(recordCount, pageSize)
+              additionParam <- fetchAdditionalParams(encodedQuery, pageSize)
+            } yield {
+              /*val articles = (1 to totalPages).map(_ => fetchRecord(encodedQuery, picoVal.id, appDao, _, pageSize))*/
+              for (pageNo <- 1 to 2) {
+                fetchRecord(additionParam, picoVal.id, appDao, pageNo, pageSize)
+              }
+              Response(empty, 200, Option(s"Total articles saved are ${recordCount}"), empty)
+            }
+          case None => Future {
+            Response(empty, 200, Option("No pico data found"), empty)
+          }
+        }
+      case None => Future {
+        Response(empty, 200, Option("No data found"), empty)
+      }
+    }
+  }
+  private def fetchCounts(queryStr : String) : Future[Int] = {
+    val countUrl = s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&rettype=count&term=$queryStr&api_key=$API_KEY&email=$API_EMAIL"
+    for {
+      count <- callApi(countUrl, extractCountFromXml)
+    } yield {
+      count.headOption.getOrElse(0)
+    }
+  }
+
+  private def fetchAdditionalParams(queryStr: String, retMax: Int) = {
+    val extractParams = s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=$queryStr&api_key=$API_KEY&email=$API_EMAIL&usehistory=y&retmax=$retMax"
+    for {
+      additionalParams <- callApi(extractParams, extractAdditionalParams)
+    } yield {
+      additionalParams.headOption.getOrElse(Map.empty)
+    }
+  }
+
+  def totalPages(totalCount: Int, pageSize: Int): Future[Int] = Future {
+    math.ceil(totalCount.toDouble / pageSize).toInt
+  }
+  private def fetchRecord(additionParam : Map[String, String], picoId : Int, dao : AppDAO, pageNum : Int, pageSize : Int = 20) = {
+    val webEnv = additionParam.getOrElse("webEnv", "")
+    val queryKey = additionParam.getOrElse("queryKey", "")
+    val startIndex = (pageNum - 1) * pageSize
+    val fetchUrl = s"$BASE_URL/efetch.fcgi?db=$PUBMED_DB_NAME&retmode=xml&rettype=abstract&retstart=$startIndex&retmax=$pageSize&query_key=$queryKey&api_key=$API_KEY&email=$API_EMAIL&WebEnv=$webEnv"
+    for {
+      articles <- callApi(fetchUrl, extractArticle)
+    } yield dao.saveArticles(picoId, articles)
+  }
+
+
+  private def extractArticle(xml: Elem): Future[Seq[Article]] = Future {
+    val articles = xml \\ "PubmedArticle"
+    articles.map(toArticle)
+  }
+
+  def extractAdditionalParams(xml: Elem): Future[Seq[Map[String, String]]] = Future {
+    val webenv = (xml \ "WebEnv").text
+    val querykey = (xml \ "QueryKey").text
+    Seq(Map("webEnv" -> webenv, "queryKey" -> querykey))
+  }
+
+  private def toArticle(article : Node) = {
+    Article(
+      id = None,
+      title = (article \ "MedlineCitation" \ "Article" \ "ArticleTitle").text,
+      authors = (article \ "MedlineCitation" \ "Article" \ "AuthorList" \ "Author" \ "LastName").map(_.text).mkString(", "),
+      journal = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "Title").text,
+      pubDate = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "JournalIssue" \ "PubDate" \ "Year").text
+    )
   }
 }

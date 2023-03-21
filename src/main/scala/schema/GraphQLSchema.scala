@@ -2,13 +2,13 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import generator.PubMedSearch.{executeQuery, fetchDataWithStaticClassifier}
+import generator.PubMedSearch.{executeQuery, buildQueryWithStaticClassifier}
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
 import sangria.macros.derive._
 import sangria.marshalling.sprayJson._
-import sangria.schema.{StringType, _}
+import sangria.schema._
 import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
@@ -328,19 +328,32 @@ object GraphQLSchema {
           val meSHLoaderDao = config.ctx.meSHLoader
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
-            /*patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)*/
             pico <- dao.getPicoDataBySoapId(fetchPicoRequest.ids.head)
-            data <- fetchDataWithStaticClassifier(pico.headOption, meSHLoaderDao, fetchPicoRequest.limit.getOrElse(10))
+            query <- buildQueryWithStaticClassifier(pico.headOption, meSHLoaderDao)
+            data <- executeQuery(pico.headOption, query, dao)
           } yield data
         }
       ),
-      Field(
+      /*Field(
         "runQuery",
         OptionType(ResponseDataType),
         arguments = Query :: Limit :: Nil,
         resolve = config => {
           for {
             data <- executeQuery(Option(config.arg(Query)), config.arg(Limit))
+          } yield data
+        }
+      )*/
+      Field(
+        "runQuery",
+        OptionType(ResponseDataType),
+        arguments = Query :: Id :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val soapId = config.arg(Id)
+          for {
+            pico <- dao.getPicoDataBySoapId(soapId)
+            data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao)
           } yield data
         }
       )
