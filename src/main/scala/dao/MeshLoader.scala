@@ -3,6 +3,7 @@ package dao
 import org.neo4j.driver.v1.{Driver, Record}
 import parser.CustomXMLParser
 
+import scala.concurrent.Future
 import scala.io.Source
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.FutureConverters
@@ -18,7 +19,7 @@ case class DescriptorRecord(ui: DescriptorUI, name: DescriptorName, treeNumber: 
 
 class MeSHLoaderDao(connection: Driver) {
 
-  def getTerms(terms: Seq[String]) = {
+  def getTerms(terms: Seq[String]): Future[Seq[DescriptorName]] = {
     val queryString = s"OPTIONAL MATCH (d : Descriptor) WHERE d.name IN [${terms.map(s => s"'$s'").map(_.trim.toLowerCase).mkString(",")}] RETURN d.name as name"
     getData(queryString, readDescriptorName)
   }
@@ -51,8 +52,9 @@ class MeSHLoaderDao(connection: Driver) {
           session.run("CREATE INDEX ON :Descriptor(name)")
 
           for (descriptorRecord <- descriptorRecords) {
-            session.run(s"CREATE (d:Descriptor {ui: '${descriptorRecord.ui.ui}', name: '${descriptorRecord.name.name}'})")
-
+            val ui = descriptorRecord.ui.ui.replaceAll("'", "\"")
+            val name = descriptorRecord.name.name.replaceAll("'", "\"")
+            session.run(s"CREATE (d:Descriptor {ui: '$ui', name: '$name'})")
             /*session.run(
               """CREATE (d:Descriptor {ui: $ui, name: $name})
                        FOREACH (treeNumber IN $treeNumbers |
