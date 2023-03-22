@@ -548,7 +548,10 @@ object GraphQLSchema {
           for {
             picoData <- dao.getPicoDataBySoapId(soapId)
             pico <- dao.updateQuery(picoData.headOption.get.id, searchQuery)
-          } yield pico
+          } yield {
+            dao.removeAllArticles(picoData.headOption.get.id)
+            pico
+          }
         }
       ),
 

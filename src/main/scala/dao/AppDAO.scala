@@ -159,7 +159,7 @@ class AppDAO(connection: Driver) {
   }
 
   def saveArticles(picoId: Int, articles: Seq[Article]): Unit = {
-    var session = connection.session()
+    val session = connection.session()
     try {
       val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
         " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
