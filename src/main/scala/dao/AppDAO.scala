@@ -128,7 +128,7 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readPatientSoapCreatedNode)
   }
 
-  private val returnPicoGenQuery = s" ID(pico) as picoId, pico.problem as problem, pico.intervention as intervention, pico.comparison as comparison, pico.outcome as outcome,pico.timePeriod as timePeriod, pico.createdAt as picoCreatedAt"
+  private val returnPicoGenQuery = s" ID(pico) as picoId, pico.problem as problem, pico.intervention as intervention, pico.comparison as comparison, pico.outcome as outcome,pico.timePeriod as timePeriod, pico.createdAt as picoCreatedAt, pico.searchQuery as searchQuery"
 
   def createPico(pico: Pico): Future[Pico] = {
     var queryString = s"CREATE (pico : Pico{ problem: '${pico.problem}', intervention: '${pico.intervention}', comparison: '${pico.comparison.getOrElse("")}', outcome: '${pico.outcome}', timePeriod: '${pico.timePeriod.getOrElse("")}', createdAt : ${getTodayDateTimeNeo4j(pico.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
@@ -147,7 +147,13 @@ class AppDAO(connection: Driver) {
   }
 
   def updatePico(pico: Pico): Future[Pico] = {
-    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = ${pico.id}  SET pico.problem = '${pico.problem}', pico.intervention = '${pico.intervention}', pico.comparison = '${pico.comparison.getOrElse("")}', pico.timePeriod = '${pico.timePeriod.getOrElse("")}', pico.outcome = '${pico.outcome}' RETURN"
+    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = ${pico.id}  SET pico.problem = '${pico.problem}', pico.intervention = '${pico.intervention}', pico.comparison = '${pico.comparison.getOrElse("")}', pico.timePeriod = '${pico.timePeriod.getOrElse("")}', pico.outcome = '${pico.outcome}' REMOVE pico.searchQuery RETURN "
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+
+  def updateQuery(picoId: Int, query : String): Future[Pico] = {
+    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = $picoId  SET pico.searchQuery = '$query' RETURN "
     queryString += returnPicoGenQuery
     writeData(queryString, readPico)
   }
@@ -468,10 +474,11 @@ class AppDAO(connection: Driver) {
       id = record.get("picoId").asInt(),
       problem = record.get("problem").asString(),
       intervention = record.get("intervention").asString(),
-      comparison = Option(record.get("comparison").asString()),
+      comparison = Option(record.get("comparison").asString("")),
       outcome = record.get("outcome").asString(),
       createdAt = Option(record.get("picoCreatedAt").asLocalDateTime()),
-      timePeriod = Option(record.get("timePeriod").asString())
+      searchQuery = Option(record.get("searchQuery").asString(null)),
+      timePeriod = Option(record.get("timePeriod").asString(""))
     )
   }
 

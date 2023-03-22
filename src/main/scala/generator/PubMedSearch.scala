@@ -2,6 +2,7 @@ package generator
 
 import dao.{AppDAO, MeSHLoaderDao}
 import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
+import generator.PubMedSearch.subjectHeadingJoiner
 import generator.StaticMeSHSearch.classifyTerms
 import models.{Article, Pico, Response}
 import schema.DBSchema.config
@@ -19,30 +20,35 @@ object PubMedSearch {
   val API_KEY: String = config.getString("ncbi_api_key")
   val API_EMAIL: String = config.getString("ncbi_email")
 
-  def buildQueryWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao): Future[Option[String]] = {
+  def buildQueryWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, appDAO: AppDAO): Future[Option[String]] = {
     picoD match {
       case Some(pico) =>
-        for {
-          problem_terms <- classifyTerms(pico.problem.split(" "), dao)
-          problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
-//          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
+        pico.searchQuery match {
+          case Some(_) => Future {
+            pico.searchQuery
+          }
+          case None =>
+            for {
+              problem_terms <- classifyTerms(pico.problem.split(" "), dao)
+              problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
+              //          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
-          outcome_terms <- classifyTerms(pico.outcome.split(" "), dao)
-          outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
-//          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
+              outcome_terms <- classifyTerms(pico.outcome.split(" "), dao)
+              outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
+              //          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
-          intervention_terms <- classifyTerms(pico.intervention.split(" "), dao)
-          intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-//          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+              intervention_terms <- classifyTerms(pico.intervention.split(" "), dao)
+              intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
+              //          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-          intervention_terms <- classifyTerms(pico.comparison.getOrElse("").split(" "), dao)
-          comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-//          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+              intervention_terms <- classifyTerms(pico.comparison.getOrElse("").split(" "), dao)
+              comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
+              //          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-          query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
-          /*response <- executeQuery(query, retMax)*/
-        } yield {
-          query
+              query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
+            } yield {
+              query
+            }
         }
       case None =>
         Future {
@@ -108,7 +114,7 @@ object PubMedSearch {
               for (pageNo <- 1 to 2) {
                 fetchRecord(additionParam, picoVal.id, appDao, pageNo, pageSize)
               }
-              Response(empty, 200, Option(s"Total articles saved are ${recordCount}"), empty)
+              Response(empty, 200, Option(s"Total articles saved are $recordCount"), empty)
             }
           case None => Future {
             Response(empty, 200, Option("No pico data found"), empty)

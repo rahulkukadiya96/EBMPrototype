@@ -320,18 +320,16 @@ object GraphQLSchema {
         }
       ),
       Field(
-        "search",
+        "build_query",
         OptionType(ResponseDataType),
-        arguments = FetchPicoRequestArg :: Nil,
+        arguments = Id :: Nil,
         resolve = config => {
           val dao = config.ctx.dao
           val meSHLoaderDao = config.ctx.meSHLoader
-          val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
-            pico <- dao.getPicoDataBySoapId(fetchPicoRequest.ids.head)
-            query <- buildQueryWithStaticClassifier(pico.headOption, meSHLoaderDao)
-            data <- executeQuery(pico.headOption, query, dao)
-          } yield data
+            pico <- dao.getPicoDataBySoapId(config.arg(Id))
+            query <- buildQueryWithStaticClassifier(pico.headOption, meSHLoaderDao, dao)
+          } yield Response(Option.empty, 200, Option("Success"), query)
         }
       ),
       /*Field(
@@ -415,7 +413,7 @@ object GraphQLSchema {
   implicit val ObjectiveFormat: RootJsonFormat[Objective] = jsonFormat6(Objective)
   implicit val AssessmentFormat: RootJsonFormat[Assessment] = jsonFormat4(Assessment)
   implicit val PlanFormat: RootJsonFormat[Plan] = jsonFormat6(Plan)
-  implicit val PicoFormat: RootJsonFormat[Pico] = jsonFormat7(Pico)
+  implicit val PicoFormat: RootJsonFormat[Pico] = jsonFormat8(Pico)
 
 
   implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
@@ -429,6 +427,7 @@ object GraphQLSchema {
   private val SoapPatientIdArg = Argument("soapId", IntType)
 
   private val MeshPathArg = Argument("filePath", StringType)
+  private val SearchQuery = Argument("searchQuery", StringType)
 
   private val Mutation = ObjectType(
     "Mutation",
@@ -535,6 +534,20 @@ object GraphQLSchema {
           val pico = c.arg(PicoDataArg)
           for {
             pico <- dao.updatePico(pico)
+          } yield pico
+        }
+      ),
+
+      Field("update_query",
+        PICODataType,
+        arguments = SoapPatientIdArg :: SearchQuery :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val soapId = c.arg(SoapPatientIdArg)
+          val searchQuery = c.arg(SearchQuery)
+          for {
+            picoData <- dao.getPicoDataBySoapId(soapId)
+            pico <- dao.updateQuery(picoData.headOption.get.id, searchQuery)
           } yield pico
         }
       ),
