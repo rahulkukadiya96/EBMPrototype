@@ -4,6 +4,7 @@ import models._
 import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
+import java.lang.Math.{max, min}
 import java.time.LocalDateTime
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -177,7 +178,7 @@ class AppDAO(connection: Driver) {
 
   private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate "
   def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
-    val skip = (pageNo - 1) * limit
+    val skip = max((pageNo - 1) * limit, 0)
     val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
     val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE + ORDER_PAGINATION
     getData(queryString, readArticle)

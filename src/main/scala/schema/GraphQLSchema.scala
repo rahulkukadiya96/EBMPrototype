@@ -2,7 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import generator.PubMedSearch.{executeQuery, buildQueryWithStaticClassifier}
+import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
@@ -13,6 +13,7 @@ import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
 
+import java.lang.Math.min
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
@@ -342,11 +343,14 @@ object GraphQLSchema {
         arguments = Id :: Limit :: PageNo :: Nil,
         resolve = config => {
           val dao = config.ctx.dao
+          val limit = config.arg(Limit)
+
           for {
             pico <- dao.getPicoDataBySoapId(config.arg(Id))
             cnt <- dao.fetchArticleCount(pico.headOption.get.id)
-            articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), config.arg(Limit))
-          } yield ArticleListResponse(200, Option("Success"), Option(cnt), Option(articles))
+            totalPages <- totalPages(cnt, limit)
+            articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), limit)
+          } yield ArticleListResponse(200, Option("Success"), Option(totalPages), Option(articles))
         }
       ),
       /*Field(
