@@ -7,6 +7,7 @@ import generator.StaticMeSHSearch.classifyTerms
 import models.{Article, Pico, Response}
 import schema.DBSchema.config
 
+import java.lang.Math.min
 import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -96,7 +97,7 @@ object PubMedSearch {
     s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=${urlEncode(query)}&retmax=$retMax"
   }
 
-  def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO) = {
+  def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO, limit : Int) = {
     val pageSize = 25
     query match {
       case Some(queryStr) =>
@@ -105,16 +106,16 @@ object PubMedSearch {
             val encodedQuery= urlEncode(queryStr)
             for {
               recordCount <- fetchCounts(encodedQuery)
-              totalPages <- totalPages(recordCount, pageSize)
+              totalPages <- totalPages(min(recordCount, limit), pageSize)
               additionParam <- fetchAdditionalParams(encodedQuery, pageSize)
             } yield {
               // Remove existing articles
               appDao.removeAllArticles(picoVal.id)
               /*val articles = (1 to totalPages).map(_ => fetchRecord(encodedQuery, picoVal.id, appDao, _, pageSize))*/
-              for (pageNo <- 1 to 2) {
+              for (pageNo <- 1 to totalPages) {
                 fetchRecord(additionParam, picoVal.id, appDao, pageNo, pageSize)
               }
-              Response(empty, 200, Option(s"Total articles saved are $recordCount"), empty)
+              Response(empty, 200, Option(s"Total articles saved are ${min(recordCount, limit)}"), empty)
             }
           case None => Future {
             Response(empty, 200, Option("No pico data found"), empty)

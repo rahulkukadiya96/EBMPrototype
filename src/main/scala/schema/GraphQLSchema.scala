@@ -342,7 +342,7 @@ object GraphQLSchema {
           } yield data
         }
       )*/
-      Field(
+      /*Field(
         "runQuery",
         OptionType(ResponseDataType),
         arguments = Query :: Id :: Nil,
@@ -354,7 +354,7 @@ object GraphQLSchema {
             data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao)
           } yield data
         }
-      )
+      )*/
     )
   )
 
@@ -540,11 +540,11 @@ object GraphQLSchema {
 
       Field("update_query",
         PICODataType,
-        arguments = SoapPatientIdArg :: SearchQuery :: Nil,
+        arguments = SoapPatientIdArg :: Query :: Nil,
         resolve = c => {
           val dao = c.ctx.dao
           val soapId = c.arg(SoapPatientIdArg)
-          val searchQuery = c.arg(SearchQuery)
+          val searchQuery = c.arg(Query)
           for {
             picoData <- dao.getPicoDataBySoapId(soapId)
             pico <- dao.updateQuery(picoData.headOption.get.id, searchQuery)
@@ -554,6 +554,19 @@ object GraphQLSchema {
           }
         }
       ),
+      Field(
+        "execute_query",
+        OptionType(ResponseDataType),
+        arguments = Query :: SoapPatientIdArg :: Limit :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val soapId = config.arg(SoapPatientIdArg)
+          for {
+            pico <- dao.getPicoDataBySoapId(soapId)
+            data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao, config.arg(Limit))
+          } yield data
+        }
+      )
 
       /*Field("updatePatientSOAP",
         PatientSOAPDataType,
