@@ -25,6 +25,7 @@ object GraphQLSchema {
   private val Ids = Argument("ids", ListInputType(IntType))
   private val Query = Argument("query", StringType)
   private val Limit = Argument("limit", IntType)
+  private val PageNo = Argument("pageNo", IntType)
 
   /**
    * conversions between custom data type (LocalDateTime) and type Sangria understand and then back again to custom type.
@@ -177,6 +178,9 @@ object GraphQLSchema {
   )
 
   private val FetchPicoRequestArg = Argument("data", FetchPicoRequestInputType)
+
+  implicit val ArticleDataType: ObjectType[Unit, Article] = deriveObjectType[Unit, Article]()
+  private lazy val ArticleListResponseType: ObjectType[Unit, ArticleListResponse] = deriveObjectType[Unit, ArticleListResponse]()
 
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
@@ -332,6 +336,19 @@ object GraphQLSchema {
           } yield Response(Option.empty, 200, Option("Success"), query)
         }
       ),
+      Field(
+        "fetch_article",
+        OptionType(ArticleListResponseType),
+        arguments = Id :: Limit :: PageNo :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          for {
+            pico <- dao.getPicoDataBySoapId(config.arg(Id))
+            cnt <- dao.fetchArticleCount(pico.headOption.get.id)
+            articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), config.arg(Limit))
+          } yield ArticleListResponse(200, Option("Success"), Option(cnt), Option(articles))
+        }
+      ),
       /*Field(
         "runQuery",
         OptionType(ResponseDataType),
@@ -427,7 +444,6 @@ object GraphQLSchema {
   private val SoapPatientIdArg = Argument("soapId", IntType)
 
   private val MeshPathArg = Argument("filePath", StringType)
-  private val SearchQuery = Argument("searchQuery", StringType)
 
   private val Mutation = ObjectType(
     "Mutation",

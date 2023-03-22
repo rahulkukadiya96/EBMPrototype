@@ -175,6 +175,19 @@ class AppDAO(connection: Driver) {
     }
   }
 
+  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate "
+  def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
+    val skip = (pageNo - 1) * limit
+    val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE + ORDER_PAGINATION
+    getData(queryString, readArticle)
+  }
+
+  def fetchArticleCount(picoId: Int): Future[Int] = {
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId RETURN count(id(a)) as cnt"
+    writeData(queryString, readCnt)
+  }
+
   def removeAllArticles(picoId: Int): Unit = {
     val query = s"MATCH (p:Pico)-[r:HAS_ARTICLE]->(a:Article) WHERE r.picoId = $picoId DETACH DELETE a "
     val session = connection.session()
@@ -490,5 +503,9 @@ class AppDAO(connection: Driver) {
       journal = record.get("journal").asString(),
       pubDate = record.get("pubDate").asString(),
     )
+  }
+
+  private def readCnt(record: Record): Int = {
+    record.get("cnt").asInt()
   }
 }
