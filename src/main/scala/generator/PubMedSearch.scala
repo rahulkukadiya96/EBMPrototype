@@ -32,19 +32,15 @@ object PubMedSearch {
             for {
               problem_terms <- classifyTerms(getKeywords(pico.problem), dao)
               problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
-              //problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
               outcome_terms <- classifyTerms(getKeywords(pico.outcome), dao)
               outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
-              //outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
               intervention_terms <- classifyTerms(getKeywords(pico.intervention), dao)
               intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-              //intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-              intervention_terms <- classifyTerms(getKeywords(pico.comparison.getOrElse("")), dao)
-              comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-              //comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+              comp_terms <- classifyTerms(getKeywords(pico.comparison.getOrElse("")), dao)
+              comparision_search_terms <- subjectHeadingJoiner(comp_terms.subject_headings)
 
               query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
             } yield {
