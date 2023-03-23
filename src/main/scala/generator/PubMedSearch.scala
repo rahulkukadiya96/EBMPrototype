@@ -1,8 +1,8 @@
 package generator
 
+import convertor.Preprocessor.getKeywords
 import dao.{AppDAO, MeSHLoaderDao}
 import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
-import generator.PubMedSearch.subjectHeadingJoiner
 import generator.StaticMeSHSearch.classifyTerms
 import models.{Article, Pico, Response}
 import schema.DBSchema.config
@@ -30,21 +30,21 @@ object PubMedSearch {
           }
           case None =>
             for {
-              problem_terms <- classifyTerms(pico.problem.split(" "), dao)
+              problem_terms <- classifyTerms(getKeywords(pico.problem), dao)
               problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
-              //          problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
+              //problem_search_terms <- searchSubjectHeading(problem_terms.subject_headings, subjectHeadingJoiner)
 
-              outcome_terms <- classifyTerms(pico.outcome.split(" "), dao)
+              outcome_terms <- classifyTerms(getKeywords(pico.outcome), dao)
               outcome_search_terms <- subjectHeadingJoiner(outcome_terms.subject_headings)
-              //          outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
+              //outcome_search_terms <- searchSubjectHeading(outcome_terms.subject_headings, subjectHeadingJoiner)
 
-              intervention_terms <- classifyTerms(pico.intervention.split(" "), dao)
+              intervention_terms <- classifyTerms(getKeywords(pico.intervention), dao)
               intervention_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-              //          intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+              //intervention_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
-              intervention_terms <- classifyTerms(pico.comparison.getOrElse("").split(" "), dao)
+              intervention_terms <- classifyTerms(getKeywords(pico.comparison.getOrElse("")), dao)
               comparision_search_terms <- subjectHeadingJoiner(intervention_terms.subject_headings)
-              //          comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
+              //comparision_search_terms <- searchSubjectHeading(intervention_terms.subject_headings, subjectHeadingJoiner)
 
               query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
             } yield {
