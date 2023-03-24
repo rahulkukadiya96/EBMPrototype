@@ -55,7 +55,7 @@ object PubMedSearch {
     }
   }
 
-  def executeQuery(query: Option[String], retMax: Int) = {
+  def executeQuery(query: Option[String], retMax: Int): Future[Response] = {
     query match {
       case Some(queryStr) =>
         for {
@@ -93,7 +93,7 @@ object PubMedSearch {
     s"$BASE_URL/esearch.fcgi?db=$PUBMED_DB_NAME&term=${urlEncode(query)}&retmax=$retMax"
   }
 
-  def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO, limit : Int) = {
+  def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO, limit : Int): Future[Response] = {
     val pageSize = 25
     query match {
       case Some(queryStr) =>

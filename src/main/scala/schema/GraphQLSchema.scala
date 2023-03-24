@@ -352,30 +352,7 @@ object GraphQLSchema {
             articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), limit)
           } yield ArticleListResponse(200, Option("Success"), Option(totalPages), Option(articles))
         }
-      ),
-      /*Field(
-        "runQuery",
-        OptionType(ResponseDataType),
-        arguments = Query :: Limit :: Nil,
-        resolve = config => {
-          for {
-            data <- executeQuery(Option(config.arg(Query)), config.arg(Limit))
-          } yield data
-        }
-      )*/
-      /*Field(
-        "runQuery",
-        OptionType(ResponseDataType),
-        arguments = Query :: Id :: Nil,
-        resolve = config => {
-          val dao = config.ctx.dao
-          val soapId = config.arg(Id)
-          for {
-            pico <- dao.getPicoDataBySoapId(soapId)
-            data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao)
-          } yield data
-        }
-      )*/
+      )
     )
   )
 
