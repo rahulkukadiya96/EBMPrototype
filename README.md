@@ -37,44 +37,6 @@ The PICO elements could be:
 * C: Alternative antibiotic treatment options
 * O: Improvement in pneumonia symptoms
 
-# Possible Question Sets
-
-## Problem or Patient
-*   What is the age range of the patients? 
-*   What is the gender distribution of the patients?
-*   What is the ethnicity or race of the patients?
-*   What is the socioeconomic status of the patients?
-*   What is the medical history of the patients?
-*   What is the current health status of the patients?
-*   Are there any comorbidity present in the patients?
-*   What is the geographic location of the patients?
-*   Are there any exclusion criteria for the patients?
-
-## Intervention or Exposure
-* What is the treatment being considered?
-* What is the dose of the treatment?
-* What is the duration of the treatment?
-* What is the mode of delivery of the treatment?
-* Are there any alternative treatments available?
-
-## Comparison Intervention or Exposure
-* What is the standard treatment for this condition?
-* What is the placebo treatment for this condition?
-* What is the comparator treatment for this condition?
-
-## Outcome of Interest
-* What is the primary outcome of interest?
-* What is the secondary outcome of interest?
-* What is the timeframe for measuring outcomes?
-* What is the method for measuring outcomes?
-
-## Time Frame or Setting
-* What is the timeframe for the study?
-* Is this a retrospective or prospective study?
-* What is the follow-up period?
-* What is the time period for data collection?
-
-
 # Search Terms
 **Keywords** 
     Normal words that are coming to you naturally. 
