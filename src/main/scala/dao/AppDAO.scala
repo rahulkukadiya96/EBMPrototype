@@ -163,9 +163,9 @@ class AppDAO(connection: Driver) {
     val session = connection.session()
     try {
       val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
-        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
+        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate, abstractText: $abstractText}) RETURN id(a) AS articleId"
       articles.map(article => {
-        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate)
+        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate, "abstractText" -> article.abstractText)
         session.run(createArticleQuery, params.asJava)
       })
     } catch {
@@ -176,7 +176,7 @@ class AppDAO(connection: Driver) {
     }
   }
 
-  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate "
+  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate , a.abstractText as abstractText "
   def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
     val skip = max((pageNo - 1) * limit, 0)
     val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
@@ -503,6 +503,7 @@ class AppDAO(connection: Driver) {
       authors = record.get("authors").asString(),
       journal = record.get("journal").asString(),
       pubDate = record.get("pubDate").asString(),
+      abstractText = record.get("abstractText").asString()
     )
   }
 
