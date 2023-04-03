@@ -1,13 +1,13 @@
 package config
 
-import dao.AppDAO
+import dao.{AppDAO, MeSHLoaderDao}
 import exception.{AuthenticationException, AuthorizationException}
 import models.Patient
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration.Inf
 
-case class MyContext(dao: AppDAO, currentUser: Option[Patient] = None) {
+case class MyContext(dao: AppDAO, meSHLoader: MeSHLoaderDao, currentUser: Option[Patient] = None) {
   /*def login(email: String, password: String): Patient = {
     val userOpt = Await result(dao.authenticate(email, password), Inf)
     userOpt.getOrElse(

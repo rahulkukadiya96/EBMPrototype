@@ -16,10 +16,12 @@ lazy val root = (project in file("."))
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
     libraryDependencies += "org.sangria-graphql" %% "sangria-spray-json" % "1.0.3",
+
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.6.16",
     libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.6.16",
     libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+    libraryDependencies += "ch.megard" %% "akka-http-cors" % "1.0.0",
 
     libraryDependencies += "com.typesafe.slick" %% "slick" % slickVersion,
     libraryDependencies += "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,

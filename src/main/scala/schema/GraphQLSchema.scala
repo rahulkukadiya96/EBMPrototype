@@ -2,17 +2,18 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import generator.PubMedSearch
+import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
 import sangria.macros.derive._
 import sangria.marshalling.sprayJson._
-import sangria.schema.{StringType, _}
+import sangria.schema._
 import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
 
+import java.lang.Math.min
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
@@ -23,7 +24,9 @@ object GraphQLSchema {
 
   private val Id = Argument("id", IntType)
   private val Ids = Argument("ids", ListInputType(IntType))
-
+  private val Query = Argument("query", StringType)
+  private val Limit = Argument("limit", IntType)
+  private val PageNo = Argument("pageNo", IntType)
 
   /**
    * conversions between custom data type (LocalDateTime) and type Sangria understand and then back again to custom type.
@@ -32,7 +35,7 @@ object GraphQLSchema {
     "LocalDateTime", // Define the name
     coerceOutput = (localDateTime, _) => DateTimeFormatUtil.fromDateToStr(ofPattern("yyyy-MM-dd HH:mm"), localDateTime).getOrElse(LocalDateTimeCoerceViolation.errorMessage),
     coerceInput = {
-      case StringValue(dt, _, _,_,_) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
+      case StringValue(dt, _, _, _, _) => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), dt)).toRight(LocalDateTimeCoerceViolation)
     },
     coerceUserInput = {
       case s: String => (DateTimeFormatUtil fromStrToDate(ofPattern("yyyy-MM-dd"), s)).toRight(LocalDateTimeCoerceViolation)
@@ -168,12 +171,17 @@ object GraphQLSchema {
     Interfaces(IdentifiableType)
   )
 
-  implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat2(FetchPicoRequest)
+  private lazy val ResponseDataType: ObjectType[Unit, Response] = deriveObjectType[Unit, Response]()
+
+  implicit val FetchPicoRequestFormat: RootJsonFormat[FetchPicoRequest] = jsonFormat3(FetchPicoRequest)
   implicit val FetchPicoRequestInputType: InputObjectType[FetchPicoRequest] = deriveInputObjectType[FetchPicoRequest](
     InputObjectTypeName("FETCH_PICO_REQUEST_INPUT_TYPE")
   )
 
   private val FetchPicoRequestArg = Argument("data", FetchPicoRequestInputType)
+
+  implicit val ArticleDataType: ObjectType[Unit, Article] = deriveObjectType[Unit, Article]()
+  private lazy val ArticleListResponseType: ObjectType[Unit, ArticleListResponse] = deriveObjectType[Unit, ArticleListResponse]()
 
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
@@ -303,8 +311,46 @@ object GraphQLSchema {
           val fetchPicoRequest = config.arg(FetchPicoRequestArg)
           for {
             patientSoapList <- dao.getSoapData(fetchPicoRequest.ids)
-            data <- PubMedSearch.fetchData((transformList(fetchPicoRequest.comparison)(patientSoapList)).head, 10)
           } yield transformList(fetchPicoRequest.comparison)(patientSoapList)
+        }
+      ),
+      Field(
+        "fetch_pico",
+        OptionType(ListType(PICODataType)),
+        arguments = Id :: Nil,
+        resolve = config => {
+          for {
+            picoData <- config.ctx.dao.getPicoDataBySoapId(config.arg(Id))
+          } yield picoData
+        }
+      ),
+      Field(
+        "build_query",
+        OptionType(ResponseDataType),
+        arguments = Id :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val meSHLoaderDao = config.ctx.meSHLoader
+          for {
+            pico <- dao.getPicoDataBySoapId(config.arg(Id))
+            query <- buildQueryWithStaticClassifier(pico.headOption, meSHLoaderDao, dao)
+          } yield Response(Option.empty, 200, Option("Success"), query)
+        }
+      ),
+      Field(
+        "fetch_article",
+        OptionType(ArticleListResponseType),
+        arguments = Id :: Limit :: PageNo :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val limit = config.arg(Limit)
+
+          for {
+            pico <- dao.getPicoDataBySoapId(config.arg(Id))
+            cnt <- dao.fetchArticleCount(pico.headOption.get.id)
+            totalPages <- totalPages(cnt, limit)
+            articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), limit)
+          } yield ArticleListResponse(200, Option("Success"), Option(totalPages), Option(articles))
         }
       )
     )
@@ -355,12 +401,17 @@ object GraphQLSchema {
     InputObjectTypeName("PLAN_INPUT_TYPE")
   )
 
+  implicit val PicoDataInputType : InputObjectType[Pico] = deriveInputObjectType[Pico](
+    InputObjectTypeName("PICO_INPUT_TYPE")
+  )
+
 
   implicit val ccEncFormat: RootJsonFormat[CCEncounter] = jsonFormat4(CCEncounter)
   implicit val PatientMedicalHistoryFormat: RootJsonFormat[PatientMedicalHistory] = jsonFormat7(PatientMedicalHistory)
   implicit val ObjectiveFormat: RootJsonFormat[Objective] = jsonFormat6(Objective)
   implicit val AssessmentFormat: RootJsonFormat[Assessment] = jsonFormat4(Assessment)
   implicit val PlanFormat: RootJsonFormat[Plan] = jsonFormat6(Plan)
+  implicit val PicoFormat: RootJsonFormat[Pico] = jsonFormat8(Pico)
 
 
   implicit val subjectiveDataFormat: RootJsonFormat[SubjectiveNodeData] = jsonFormat4(SubjectiveNodeData)
@@ -368,9 +419,12 @@ object GraphQLSchema {
   private val ObjectiveDataArg = Argument("objectNodeData", ObjectiveDataInputType)
   private val AssessmentDataArg = Argument("assessmentNodeData", AssessmentDataInputType)
   private val PlanDataArg = Argument("planNodeData", PlanDataInputType)
+  private val PicoDataArg = Argument("pico", PicoDataInputType)
 
   private val PatientIdArg = Argument("patientId", IntType)
   private val SoapPatientIdArg = Argument("soapId", IntType)
+
+  private val MeshPathArg = Argument("filePath", StringType)
 
   private val Mutation = ObjectType(
     "Mutation",
@@ -447,6 +501,69 @@ object GraphQLSchema {
         tags = Authorized :: Nil,
         resolve = c => c.ctx.dao.deleteSoap(c.arg(SoapPatientIdArg))
       ),
+
+      Field("loadMeshTerms",
+        BooleanType,
+        arguments = MeshPathArg :: Nil,
+        tags = Authorized :: Nil,
+        resolve = c => c.ctx.meSHLoader.loadDictionary(c.arg(MeshPathArg))
+      ),
+
+      Field("create_pico",
+        PICODataType,
+        arguments = SoapPatientIdArg :: PicoDataArg :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val pico = c.arg(PicoDataArg)
+          val soapId = c.arg(SoapPatientIdArg)
+          for {
+            pico <- dao.createPico(pico)
+            isRelationCreated <- dao.buildRelationSoapPico(soapId, pico.id)
+          } yield pico
+        }
+      ),
+
+      Field("update_pico",
+        PICODataType,
+        arguments = PicoDataArg :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val pico = c.arg(PicoDataArg)
+          for {
+            pico <- dao.updatePico(pico)
+          } yield pico
+        }
+      ),
+
+      Field("update_query",
+        PICODataType,
+        arguments = SoapPatientIdArg :: Query :: Nil,
+        resolve = c => {
+          val dao = c.ctx.dao
+          val soapId = c.arg(SoapPatientIdArg)
+          val searchQuery = c.arg(Query)
+          for {
+            picoData <- dao.getPicoDataBySoapId(soapId)
+            pico <- dao.updateQuery(picoData.headOption.get.id, searchQuery)
+          } yield {
+            dao.removeAllArticles(picoData.headOption.get.id)
+            pico
+          }
+        }
+      ),
+      Field(
+        "execute_query",
+        OptionType(ResponseDataType),
+        arguments = Query :: SoapPatientIdArg :: Limit :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          val soapId = config.arg(SoapPatientIdArg)
+          for {
+            pico <- dao.getPicoDataBySoapId(soapId)
+            data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao, config.arg(Limit))
+          } yield data
+        }
+      )
 
       /*Field("updatePatientSOAP",
         PatientSOAPDataType,

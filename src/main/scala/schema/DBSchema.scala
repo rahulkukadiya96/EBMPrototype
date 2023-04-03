@@ -2,7 +2,7 @@ package schema
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
-import dao.AppDAO
+import dao.{AppDAO, MeSHLoaderDao}
 import monix.eval.Task
 import monix.execution.Scheduler
 import org.neo4j.driver.v1.{AuthTokens, Driver, GraphDatabase}
@@ -21,6 +21,12 @@ object DBSchema extends StrictLogging {
 
   def createDatabase: AppDAO = {
     initNeoDatabase
+  }
+
+  def createMeshLoader: MeSHLoaderDao = {
+    implicit val scheduler: Scheduler = monix.execution.Scheduler.Implicits.global
+    val neo4jConnection = createNeo4jConnection()
+    new MeSHLoaderDao(neo4jConnection)
   }
 
   private def initNeoDatabase: AppDAO = {

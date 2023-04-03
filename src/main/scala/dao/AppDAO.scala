@@ -4,7 +4,9 @@ import models._
 import org.neo4j.driver.v1.{Driver, Record}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
+import java.lang.Math.{max, min}
 import java.time.LocalDateTime
+import scala.collection.JavaConverters.mapAsJavaMapConverter
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -87,12 +89,7 @@ class AppDAO(connection: Driver) {
   private val returnPlanGenQuery = s" ID(plan) as planId, plan.indication as indication, plan.management as management, plan.summary as summary, plan.followup as followup, plan.createdAt as planCreatedAt"
 
   def createPlan(patientSoapId: Int, plan: Plan): Future[Plan] = {
-    var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $patientSoapId "
-    queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
-
-    /*queryString += s" CREATE (patientSOAP)-[:soap_plan { subId :ID(plan)  }]->(plan), "
-    queryString += s" (plan)-[:patientSOAP {patId : $patientSoapId }]->(patientSOAP) "*/
-
+    var queryString = s"CREATE (plan : Plan{ indication: '${plan.indication}', management: '${plan.management}',  summary: '${plan.summary}',  followup: '${plan.followup}', createdAt : ${getTodayDateTimeNeo4j(plan.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
     queryString += returnPlanGenQuery
     writeData(queryString, readPlan)
   }
@@ -132,6 +129,75 @@ class AppDAO(connection: Driver) {
     writeData(queryString, readPatientSoapCreatedNode)
   }
 
+  private val returnPicoGenQuery = s" ID(pico) as picoId, pico.problem as problem, pico.intervention as intervention, pico.comparison as comparison, pico.outcome as outcome,pico.timePeriod as timePeriod, pico.createdAt as picoCreatedAt, pico.searchQuery as searchQuery"
+
+  def createPico(pico: Pico): Future[Pico] = {
+    var queryString = s"CREATE (pico : Pico{ problem: '${pico.problem}', intervention: '${pico.intervention}', comparison: '${pico.comparison.getOrElse("")}', outcome: '${pico.outcome}', timePeriod: '${pico.timePeriod.getOrElse("")}', createdAt : ${getTodayDateTimeNeo4j(pico.createdAt.getOrElse(getCurrentUTCTime))} }) RETURN"
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+
+  def buildRelationSoapPico(soapNodeId: Int, picoId: Int): Future[Boolean] = Future {
+    var queryString = s"MATCH (patientSOAP: Patient_SOAP) WHERE ID(patientSOAP) = $soapNodeId "
+    queryString += s"MATCH (pico: Pico) WHERE ID(pico) = $picoId "
+
+    queryString += s" CREATE (patientSOAP)-[:soap_pico { picoId :$picoId}]->(pico), "
+    queryString += s" (pico)-[:pico_soap {patientSOAPId : $soapNodeId }]->(patientSOAP) "
+    connection.session().run(queryString)
+    true
+  }
+
+  def updatePico(pico: Pico): Future[Pico] = {
+    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = ${pico.id}  SET pico.problem = '${pico.problem}', pico.intervention = '${pico.intervention}', pico.comparison = '${pico.comparison.getOrElse("")}', pico.timePeriod = '${pico.timePeriod.getOrElse("")}', pico.outcome = '${pico.outcome}' REMOVE pico.searchQuery RETURN "
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+
+  def updateQuery(picoId: Int, query : String): Future[Pico] = {
+    var queryString = s"MATCH (pico:Pico) WHERE ID(pico) = $picoId  SET pico.searchQuery = '$query' RETURN "
+    queryString += returnPicoGenQuery
+    writeData(queryString, readPico)
+  }
+
+  def saveArticles(picoId: Int, articles: Seq[Article]): Unit = {
+    val session = connection.session()
+    try {
+      val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
+        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate}) RETURN id(a) AS articleId"
+      articles.map(article => {
+        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate)
+        session.run(createArticleQuery, params.asJava)
+      })
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+    } finally {
+      session.close()
+    }
+  }
+
+  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate "
+  def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
+    val skip = max((pageNo - 1) * limit, 0)
+    val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE + ORDER_PAGINATION
+    getData(queryString, readArticle)
+  }
+
+  def fetchArticleCount(picoId: Int): Future[Int] = {
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId RETURN count(id(a)) as cnt"
+    writeData(queryString, readCnt)
+  }
+
+  def removeAllArticles(picoId: Int): Unit = {
+    val query = s"MATCH (p:Pico)-[r:HAS_ARTICLE]->(a:Article) WHERE r.picoId = $picoId DETACH DELETE a "
+    val session = connection.session()
+    try {
+      session.run(query)
+    } finally {
+      session.close()
+    }
+  }
 
   /* Patient methods */
 
@@ -261,6 +327,11 @@ class AppDAO(connection: Driver) {
     queryString += returnAssessmentGenQuery + ","
     queryString += returnPlanGenQuery
     getData(queryString, readPatientSoapNode)
+  }
+
+  def getPicoDataBySoapId(soapId: Int): Future[Seq[Pico]] = {
+    val queryString = s"MATCH (pico : Pico)-[k:pico_soap]->(patientSOAP:Patient_SOAP) WHERE k.patientSOAPId =$soapId RETURN " + returnPicoGenQuery
+    getData(queryString, readPico)
   }
 
 
@@ -409,5 +480,33 @@ class AppDAO(connection: Driver) {
       plan = readPlan(record),
       createdAt = Some(record.get("soapCreatedAt").asLocalDateTime())
     )
+  }
+
+
+  private def readPico(record: Record): Pico = {
+    Pico(
+      id = record.get("picoId").asInt(),
+      problem = record.get("problem").asString(),
+      intervention = record.get("intervention").asString(),
+      comparison = Option(record.get("comparison").asString("")),
+      outcome = record.get("outcome").asString(),
+      createdAt = Option(record.get("picoCreatedAt").asLocalDateTime()),
+      searchQuery = Option(record.get("searchQuery").asString(null)),
+      timePeriod = Option(record.get("timePeriod").asString(""))
+    )
+  }
+
+  private def readArticle(record: Record): Article = {
+    Article(
+      id = Option(record.get("articleId").asLong()),
+      title = record.get("title").asString(),
+      authors = record.get("authors").asString(),
+      journal = record.get("journal").asString(),
+      pubDate = record.get("pubDate").asString(),
+    )
+  }
+
+  private def readCnt(record: Record): Int = {
+    record.get("cnt").asInt()
   }
 }

@@ -1,9 +1,14 @@
 package config
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, InternalServerError, OK}
+import akka.http.scaladsl.model.headers.HttpOrigin
 import akka.http.scaladsl.server.Directives.complete
 import akka.http.scaladsl.server.Route
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import ch.megard.akka.http.cors.scaladsl.model.HttpOriginMatcher
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import exception.{AuthenticationException, AuthorizationException}
 import sangria.execution.{ExceptionHandler => EHandler, _}
 import sangria.ast.Document
@@ -24,8 +29,11 @@ import scala.util.{Failure, Success}
  */
 object GraphQLServer {
   private val dao = DBSchema.createDatabase
+  private val meshLoader = DBSchema.createMeshLoader
+  val allowedOrigins = HttpOriginMatcher(HttpOrigin("http://localhost:4200"))
 
-  def endpoint(requestJSON: JsValue)(implicit ec: ExecutionContext): Route = {
+  val corsSettings = CorsSettings.defaultSettings.withAllowedOrigins(HttpOriginMatcher.*).withAllowCredentials(true).withAllowGenericHttpRequests(true).withAllowedMethods(Seq(HttpMethods.GET, HttpMethods.POST, HttpMethods.DELETE, HttpMethods.OPTIONS, HttpMethods.PUT))
+  def endpoint(requestJSON: JsValue)(implicit ec: ExecutionContext): Route = cors(corsSettings) {
     val JsObject(fields) = requestJSON
 
     val JsString(query) = fields("query")
@@ -48,7 +56,7 @@ object GraphQLServer {
   }
 
   //
-  val ErrorHandler: EHandler = EHandler {
+  private val ErrorHandler: EHandler = EHandler {
     case (_, AuthenticationException(message)) ⇒ HandledException(message)
     case (_, AuthorizationException(message)) ⇒ HandledException(message)
   }
@@ -58,7 +66,7 @@ object GraphQLServer {
     Executor.execute(
       GraphQLSchema.schemaDefinition,
       query,
-      MyContext(dao),
+      MyContext(dao, meshLoader),
       variables = vars,
       operationName = operation,
       deferredResolver = GraphQLSchema.resolver,
