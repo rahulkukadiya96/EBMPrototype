@@ -2,6 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
+import convertor.Preprocessor.generateAbstract
 import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
 import models._
 import sangria.ast.StringValue
@@ -13,7 +14,6 @@ import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
 
-import java.lang.Math.min
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
@@ -182,6 +182,9 @@ object GraphQLSchema {
 
   implicit val ArticleDataType: ObjectType[Unit, Article] = deriveObjectType[Unit, Article]()
   private lazy val ArticleListResponseType: ObjectType[Unit, ArticleListResponse] = deriveObjectType[Unit, ArticleListResponse]()
+
+
+  private lazy val BaseResponseDataType: ObjectType[Unit, BaseResponse] = deriveObjectType[Unit, BaseResponse]()
 
   val resolver: DeferredResolver[MyContext] =
     DeferredResolver.fetchers(
@@ -423,7 +426,7 @@ object GraphQLSchema {
 
   private val PatientIdArg = Argument("patientId", IntType)
   private val SoapPatientIdArg = Argument("soapId", IntType)
-
+  private val PicoIdArg = Argument("picoId", IntType)
   private val MeshPathArg = Argument("filePath", StringType)
 
   private val Mutation = ObjectType(
@@ -562,6 +565,19 @@ object GraphQLSchema {
             pico <- dao.getPicoDataBySoapId(soapId)
             data <- executeQuery(pico.headOption, Option(config.arg(Query)), dao, config.arg(Limit))
           } yield data
+        }
+      ),
+      Field(
+        "generate_abstract",
+        OptionType(BaseResponseDataType),
+        arguments = PicoIdArg :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+          for {
+            articles <- dao.fetchAllArticles(config.arg(PicoIdArg))
+            articleSummary <- generateAbstract(articles)
+            isSaved <- dao.saveArticleSummary(articleSummary)
+          } yield BaseResponse(statusCode = 200, message = Some("Success"))
         }
       )
 

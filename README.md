@@ -92,3 +92,4 @@ This is used to narrow down the results. It includes some basic filter like publ
 8) https://neo4j.com/labs/neosemantics/installation/
 9) https://medium.com/@nijhof.dns/mesh-into-neo4j-7c52e3ada6b5
 10) https://nlmpubs.nlm.nih.gov/projects/mesh/rdf/2022/
+11) https://huggingface.co/

@@ -163,9 +163,9 @@ class AppDAO(connection: Driver) {
     val session = connection.session()
     try {
       val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
-        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate, abstractText: $abstractText}) RETURN id(a) AS articleId"
+        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate, abstractText: $abstractText, summary: $summary}) RETURN id(a) AS articleId"
       articles.map(article => {
-        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate, "abstractText" -> article.abstractText)
+        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate, "abstractText" -> article.abstractText, "summary" -> article.summary.getOrElse(""))
         session.run(createArticleQuery, params.asJava)
       })
     } catch {
@@ -176,11 +176,38 @@ class AppDAO(connection: Driver) {
     }
   }
 
-  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate , a.abstractText as abstractText "
+  def saveArticleSummary(summaries: Map[Long, String]): Future[Boolean] = Future {
+    val query = "MATCH (a:Article) WHERE ID(a) = $articleId SET a.summary = $summary RETURN ID(a) AS articleId"
+    val session = connection.session()
+    try {
+      /*summaries.map { case (articleId, summary) =>
+        val params: Map[String, Object] = Map("articleId" -> articleId, "summary" -> summary)
+        session.run(query, params.asJava)
+      }*/
+      summaries.foreach(entry => {
+        val params: Map[String, AnyRef] = Map("articleId" -> entry._1.asInstanceOf[AnyRef], "summary" -> entry._2)
+        session.run(query, params.asJava)
+      })
+      true
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        false
+    } finally {
+      session.close()
+    }
+  }
+
+  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate , a.abstractText as abstractText, a.summary as summary  "
   def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
     val skip = max((pageNo - 1) * limit, 0)
     val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
     val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE + ORDER_PAGINATION
+    getData(queryString, readArticle)
+  }
+
+  def fetchAllArticles(picoId: Int): Future[Seq[Article]] = {
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE
     getData(queryString, readArticle)
   }
 
@@ -503,7 +530,8 @@ class AppDAO(connection: Driver) {
       authors = record.get("authors").asString(),
       journal = record.get("journal").asString(),
       pubDate = record.get("pubDate").asString(),
-      abstractText = record.get("abstractText").asString()
+      abstractText = record.get("abstractText").asString(),
+      summary = Option(record.get("summary").asString())
     )
   }
 

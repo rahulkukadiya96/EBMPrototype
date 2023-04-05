@@ -35,6 +35,11 @@ lazy val root = (project in file("."))
     libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "4.3.0" classifier "models",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.1.0",
 
+    // https://mvnrepository.com/artifact/com.typesafe.play/play-json
+    libraryDependencies += "com.typesafe.play" %% "play-json" % "2.9.4",
+
+    libraryDependencies += "com.lihaoyi" %% "requests" % "0.7.0",
+
     libraryDependencies += scalaTest % Test
   )
 

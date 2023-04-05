@@ -172,7 +172,8 @@ object PubMedSearch {
       authors = (article \ "MedlineCitation" \ "Article" \ "AuthorList" \ "Author" \ "LastName").map(_.text).mkString(", "),
       journal = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "Title").text,
       pubDate = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "JournalIssue" \ "PubDate" \ "Year").text,
-      abstractText = (article \ "MedlineCitation" \ "Article" \ "Abstract").text
+      abstractText = (article \ "MedlineCitation" \ "Article" \ "Abstract").text,
+      summary = None
     )
   }
 }
