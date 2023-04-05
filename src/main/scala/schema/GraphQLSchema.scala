@@ -570,11 +570,13 @@ object GraphQLSchema {
       Field(
         "generate_abstract",
         OptionType(BaseResponseDataType),
-        arguments = PicoIdArg :: Nil,
+        arguments = SoapPatientIdArg :: Nil,
         resolve = config => {
           val dao = config.ctx.dao
+          val soapId = config.arg(SoapPatientIdArg)
           for {
-            articles <- dao.fetchAllArticles(config.arg(PicoIdArg))
+            pico <- dao.getPicoDataBySoapId(soapId)
+            articles <- dao.fetchAllArticles(pico.headOption.get.id)
             articleSummary <- generateAbstract(articles)
             isSaved <- dao.saveArticleSummary(articleSummary)
           } yield BaseResponse(statusCode = 200, message = Some("Success"))
