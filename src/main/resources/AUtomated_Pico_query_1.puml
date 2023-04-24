@@ -1,0 +1,115 @@
+@startuml
+actor User as user
+participant "Client App" as ui
+participant "App Controller" as controller
+participant "PICO Query Executor" as executor
+participant "Resolver" as resolver
+participant "GraphQL Schema Mapping" as mapping
+database "Neo4J" as db
+
+group Save PICO question
+user -> ui : Click on PICO button
+activate ui
+user <-- ui : Open the Modal for \nPICO Question
+deactivate ui
+
+user -> ui : Enter the questions \n Click on the Submit
+activate ui
+
+ui -> controller : Send the PICO questions json
+activate controller
+
+controller -> executor : Send the pico questions
+activate executor
+
+executor -> db : Create pico node \n store the questions details and \nbuild relation with SOAP node.
+activate db
+executor <- db : Return newly created \npico node details
+deactivate db
+
+controller <- executor : Return updated pico node details
+deactivate executor
+
+ui <-- controller : return updated pico questions
+deactivate controller
+
+user <-- ui : close modal
+deactivate ui
+
+end
+
+group Generate the Search query
+user -> ui : Click on Search Button
+activate ui
+
+ui -> controller : Send soap id
+activate controller
+
+controller -> executor : Fetch the PICO questions
+activate executor
+
+executor -> db : Fetch PICO question \nfor the given soap
+activate db
+executor <-- db : Return PICO Node details \nfor the given soap
+deactivate db
+
+controller <- executor : Return PICO question details
+deactivate executor
+
+controller -> mapping : Map PICO schema to GraphQL schema
+activate mapping
+mapping -> mapping : Generate GraphQL schema via QL4POMR
+mapping -> mapping : Map GraphQL schema to PICO schema
+mapping -> mapping : Generate schema mappings
+deactivate mapping
+
+controller -> resolver : Generate Resolver
+activate resolver
+
+resolver -> executor : Fetch the search query results
+activate executor
+
+executor -> db : Create query property of the pico node.
+activate db
+executor <- db : Return updated \npico node details
+deactivate db
+
+resolver <- executor : Return search query results
+deactivate executor
+
+controller <-- resolver : Return search query results
+deactivate resolver
+
+ui <-- controller : Return Generated Query
+deactivate controller
+
+user <- ui : Open Modal with PICO Search Query
+deactivate ui
+end
+
+group Save the Search query
+user -> ui : Update the query and\n Click on Save Query button
+activate ui
+
+ui -> controller : Send the query json
+activate controller
+
+controller -> executor : Send the pico query
+activate executor
+
+executor -> db : Create query property of the pico node.
+activate db
+executor <- db : Return updated \npico node details
+deactivate db
+
+controller <- executor : Return updated pico node details
+deactivate executor
+
+ui <-- controller : return updated pico questions
+deactivate controller
+
+user <-- ui : close modal
+deactivate ui
+end
+
+@enduml

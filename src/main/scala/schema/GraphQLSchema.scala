@@ -4,20 +4,24 @@ import config.MyContext
 import convertor.ConvertorUtils.transformList
 import convertor.Preprocessor.generateAbstract
 import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
+import generator.ReportGenerator.getReport
 import models._
 import sangria.ast.StringValue
 import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, RelationIds}
 import sangria.macros.derive._
-import sangria.marshalling.sprayJson._
 import sangria.schema._
 import spray.json.DefaultJsonProtocol._
 import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
 import utility.DateTimeFormatUtil
+import spray.json._
+import sangria.marshalling._
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
+import java.util.Base64
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 
 object GraphQLSchema {
 
@@ -43,6 +47,48 @@ object GraphQLSchema {
     }
   )
 
+  /*implicit val PDFScalarType : ScalarType[Array[Byte]] = ScalarType[Array[Byte]](
+    "Pdf",
+
+    coerceOutput = (pdf, _) => pdf.toArray,
+
+    coerceInput = {
+      case StringValue(bytes, _, _,_,_) =>
+        Try(Base64.getDecoder.decode(bytes)).toEither.left.map(_ => InvalidPDFCoerceViolation)
+      case _ => Left(InvalidPDFCoerceViolation)
+    },
+    coerceUserInput = {
+      case _ => Left(InvalidPDFCoerceViolation)
+    }
+  )
+
+ /* val PDFType: ObjectType[Unit, Pdf] = deriveObjectType[Unit, Pdf](
+    ObjectTypeDescription("PDFType"),
+    DocumentField("data", "The byte data representing the PDF document")
+  )*/
+
+  val PDFType: ObjectType[Unit, Pdf] = deriveObjectType[Unit, Pdf](
+    ObjectTypeDescription("PDFType"),
+  )*/
+
+  import sangria.marshalling.sprayJson._
+  implicit val PDFScalarType: ScalarType[Array[Byte]] = ScalarType[Array[Byte]](
+    "PdfScalar",
+    coerceOutput = (pdf, _) => pdf,
+    coerceInput = {
+      case StringValue(bytes, _, _, _, _) =>
+        Try(Base64.getDecoder.decode(bytes)).toEither.left.map(_ => InvalidPDFCoerceViolation)
+      case _ => Left(InvalidPDFCoerceViolation)
+    },
+    coerceUserInput = {
+      case _ => Left(InvalidPDFCoerceViolation)
+    }
+  )
+
+  val PDFType: ObjectType[Unit, Pdf] = deriveObjectType[Unit, Pdf](
+    ObjectTypeDescription("PDFType")
+  )
+
   /**
    * Created local-datetime parser object
    */
@@ -55,6 +101,18 @@ object GraphQLSchema {
     override def read(json: JsValue): LocalDateTime = json match {
       case JsString(s) => LocalDateTime.parse(s, defaultDateTimeFormat)
       case _ => throw DeserializationException("Invalid date format. It should be MM/dd/YYYY format")
+    }
+  }
+
+  implicit object ByteArrayFormatJsonFormat extends RootJsonFormat[Array[Byte]] {
+    override def write(obj: Array[Byte]): JsValue = JsArray(obj.toList.map(x => JsNumber(x & 0xff)))
+
+    override def read(json: JsValue): Array[Byte] = json match {
+      case JsArray(elements) => elements.map {
+        case JsNumber(x) => x.toByte
+        case _ => throw DeserializationException("Byte list expected")
+      }.toArray
+      case _ => throw DeserializationException("Byte list expected")
     }
   }
 
@@ -426,7 +484,6 @@ object GraphQLSchema {
 
   private val PatientIdArg = Argument("patientId", IntType)
   private val SoapPatientIdArg = Argument("soapId", IntType)
-  private val PicoIdArg = Argument("picoId", IntType)
   private val MeshPathArg = Argument("filePath", StringType)
 
   private val Mutation = ObjectType(
@@ -580,6 +637,24 @@ object GraphQLSchema {
             articleSummary <- generateAbstract(articles)
             isSaved <- dao.saveArticleSummary(articleSummary)
           } yield BaseResponse(statusCode = 200, message = Some("Success"))
+        }
+      ),
+      /*Field(
+        "generate_case_report",
+        PDFType,
+        arguments = SoapPatientIdArg :: Nil,
+        resolve = ctx => {
+          getReport()
+        }
+      )*/
+
+      Field(
+        "generate_case_report",
+        StringType,
+        arguments = SoapPatientIdArg :: Nil,
+        resolve = ctx => {
+          val pdfByteArray = getReport() // replace with your function to generate the PDF byte array
+          Base64.getEncoder.encodeToString(pdfByteArray.pdfData)
         }
       )
 

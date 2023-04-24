@@ -94,7 +94,7 @@ object PubMedSearch {
   }
 
   def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO, limit : Int): Future[Response] = {
-    val pageSize = 25
+    val pageSize = 5
     query match {
       case Some(queryStr) =>
         pico match {

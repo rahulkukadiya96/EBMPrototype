@@ -40,6 +40,11 @@ lazy val root = (project in file("."))
 
     libraryDependencies += "com.lihaoyi" %% "requests" % "0.7.0",
 
+    libraryDependencies += "com.itextpdf" % "kernel" % "7.2.5",
+    libraryDependencies += "com.itextpdf" % "forms" % "7.2.5",
+
+    libraryDependencies += "com.google.guava" % "guava" % "30.1.1-jre",
+
     libraryDependencies += scalaTest % Test
   )
 

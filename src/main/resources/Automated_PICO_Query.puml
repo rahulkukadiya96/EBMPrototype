@@ -1,0 +1,108 @@
+@startuml
+actor User as user
+participant "Client App" as ui
+participant "GraphQL Server" as gql
+participant "Scala Backend" as scala
+participant "Pre-processor" as preprocessor
+database "Neo4J" as db
+
+group Save PICO question
+user -> ui : Click on PICO button
+activate ui
+user <-- ui : Open the Modal for \nPICO Question
+deactivate ui
+
+user -> ui : Enter the questions \n Click on the Submit
+activate ui
+
+ui -> gql : Send the PICO questions json
+activate gql
+
+gql -> scala : Send the pico questions
+activate scala
+
+scala -> db : Create pico node \n store the questions details and \nbuild relation with SOAP node.
+activate db
+scala <- db : Return newly created \npico node details
+deactivate db
+
+gql <- scala : Return updated pico node details
+deactivate scala
+
+ui <-- gql : return updated pico questions
+deactivate gql
+
+user <-- ui : close modal
+deactivate ui
+
+end
+
+group Generate the Search query
+user -> ui : Click on Search Button
+activate ui
+
+ui -> gql : Send soap id
+activate gql
+
+gql -> scala : Fetch the PICO questions
+activate scala
+
+scala -> db : Fetch PICO question \nfor the given soap
+activate db
+scala <-- db : Return PICO Node details \nfor the given soap
+deactivate db
+
+gql <-- scala : Return PICO question details
+deactivate scala
+
+gql -> preprocessor : Parse the PICO question
+activate preprocessor
+
+preprocessor -> preprocessor : Convert to Word, Lemmatize and\n generate up to 3-gram keywords
+
+preprocessor -> db : Match with descriptors
+activate db
+preprocessor <-- db : Return descriptors
+deactivate db
+
+preprocessor -> preprocessor : Classify terms to keywords\n and MeSH terms
+
+preprocessor -> preprocessor : Concat MeSH terms \nof the same section by OR
+preprocessor -> preprocessor : Concat section by AND
+
+gql <-- preprocessor : Return Generated Search Query
+deactivate preprocessor
+
+ui <-- gql : Return Generated Query
+deactivate gql
+
+user <- ui : Open Modal with PICO Search Query
+deactivate ui
+end
+
+group Save the Search query
+user -> ui : Update the query and\n Click on Save Query button
+activate ui
+
+ui -> gql : Send the query json
+activate gql
+
+gql -> scala : Send the pico query
+activate scala
+
+scala -> db : Create query property of the pico node.
+activate db
+scala <- db : Return updated \npico node details
+deactivate db
+
+gql <- scala : Return updated pico node details
+deactivate scala
+
+ui <-- gql : return updated pico questions
+deactivate gql
+
+user <-- ui : close modal
+deactivate ui
+end
+
+@enduml
