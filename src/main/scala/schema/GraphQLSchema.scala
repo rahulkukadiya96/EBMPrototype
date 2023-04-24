@@ -238,6 +238,7 @@ object GraphQLSchema {
 
   private val FetchPicoRequestArg = Argument("data", FetchPicoRequestInputType)
 
+  implicit val AbstractComponentDataType: ObjectType[Unit, AbstractComponent] = deriveObjectType[Unit, AbstractComponent]()
   implicit val ArticleDataType: ObjectType[Unit, Article] = deriveObjectType[Unit, Article]()
   private lazy val ArticleListResponseType: ObjectType[Unit, ArticleListResponse] = deriveObjectType[Unit, ArticleListResponse]()
 

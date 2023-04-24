@@ -4,14 +4,14 @@ import convertor.Preprocessor.getKeywords
 import dao.{AppDAO, MeSHLoaderDao}
 import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
 import generator.StaticMeSHSearch.classifyTerms
-import models.{Article, Pico, Response}
+import models.{AbstractComponent, Article, Pico, Response}
 import schema.DBSchema.config
 
 import java.lang.Math.min
 import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.xml.{Elem, Node}
+import scala.xml.{Elem, Node, NodeSeq, Utility}
 
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -173,7 +173,53 @@ object PubMedSearch {
       journal = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "Title").text,
       pubDate = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "JournalIssue" \ "PubDate" \ "Year").text,
       abstractText = (article \ "MedlineCitation" \ "Article" \ "Abstract").text,
-      summary = None
+      summary = None,
+      abstractComponent = None
     )
+  }
+
+  /*private def toArticleAbstract(abstractComponent: NodeSeq) = {
+    /*AbstractComponent(
+      background = extractAbstractText(abstractText, "BACKGROUND"),
+      objectives = extractAbstractText(abstractText, "OBJECTIVES"),
+      methods = extractAbstractText(abstractText, "METHODS"),
+      result = extractAbstractText(abstractText, "RESULTS"),
+      conclusion = extractAbstractText(abstractText, "CONCLUSIONS"),
+    )*/
+
+    AbstractComponent(
+      background = Some(abstractComponent.filter(n => (n \@ "Label") == "BACKGROUND").text),
+      objectives = Some(abstractComponent.filter(n => (n \@ "Label") == "OBJECTIVES").text),
+      methods = Some(abstractComponent.filter(n => (n \@ "Label") == "METHODS").text),
+      result = Some(abstractComponent.filter(n => (n \@ "Label") == "RESULTS").text),
+      conclusion = Some(abstractComponent.filter(n => (n \@ "Label") == "CONCLUSIONS").text),
+    )
+  }*/
+
+  private def toArticleAbstract(abstractComponents: Node): Option[AbstractComponent] = {
+    val xmlString = Utility.serialize(abstractComponents)
+    println(xmlString)
+    val abstractTexts = abstractComponents \\ "Abstract" \\ "AbstractText"
+    val abstractMap = abstractTexts.map(a => (a \@ "Label", a.text)).toMap
+    print(s"abstractMap is ${abstractMap}")
+    abstractComponents.headOption match {
+      case Some(abstractComponent) =>
+        print(s"Head data is ${abstractComponent.text}")
+        val background = (abstractComponents \\ "AbstractText").filter(node => (node \@ "Label") == "BACKGROUND").text.trim
+        print(s"background data is ${background}")
+
+        Some(AbstractComponent(
+          background = Some((abstractComponent).filter(n => (n \@ "Label") == "BACKGROUND").text),
+          objectives = Some((abstractComponent).filter(n => (n \@ "Label") == "OBJECTIVES").text),
+          methods = Some((abstractComponent).filter(n => (n \@ "Label") == "METHODS").text),
+          result = Some((abstractComponent).filter(n => (n \@ "Label") == "RESULTS").text),
+          conclusion = Some((abstractComponent).filter(n => (n \@ "Label") == "CONCLUSION").text),
+        ))
+      case _ => None
+    }
+  }
+  private def extractAbstractText(abstractComponent: NodeSeq, label: String): Option[String] = {
+    val abstractText = abstractComponent \ "AbstractText"
+    abstractText.find(_.attribute("Label").exists(_.text == label)).map(_.text.trim)
   }
 }

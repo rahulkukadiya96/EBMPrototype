@@ -163,9 +163,30 @@ class AppDAO(connection: Driver) {
     val session = connection.session()
     try {
       val createArticleQuery = s"MATCH (pico:Pico) WHERE id(pico) = $picoId" +
-        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate, abstractText: $abstractText, summary: $summary}) RETURN id(a) AS articleId"
+        " CREATE (pico) -[:HAS_ARTICLE {picoId: id(pico)}]-> (a:Article {title: $title, authors: $authors, journal:$journal, pubDate: $pubDate, abstractText: $abstractText, summary: $summary, background: $background, objectives: $objectives, methods: $methods, result: $result, conclusion: $conclusion}) RETURN id(a) AS articleId"
       articles.map(article => {
-        val params: Map[String, Object] = Map("title" -> article.title, "authors" -> article.authors, "journal" -> article.journal, "pubDate" -> article.pubDate, "abstractText" -> article.abstractText, "summary" -> article.summary.getOrElse(""))
+        val background = article.abstractComponent.map(_.background.getOrElse("")).getOrElse("")
+        val objectives = article.abstractComponent.map(_.objectives.getOrElse("")).getOrElse("")
+        val methods = article.abstractComponent.map(_.methods.getOrElse("")).getOrElse("")
+        val result = article.abstractComponent.map(_.result.getOrElse("")).getOrElse("")
+        val conclusion = article.abstractComponent.map(_.conclusion.getOrElse("")).getOrElse("")
+
+        val params: Map[String, Object] = Map(
+          "title" -> article.title,
+          "authors" -> article.authors,
+          "journal" -> article.journal,
+          "pubDate" -> article.pubDate,
+          "abstractText" -> article.abstractText,
+
+          "summary" -> article.summary.getOrElse(""),
+
+          "background" -> background,
+          "objectives" -> objectives,
+          "methods" -> methods,
+          "result" -> result,
+          "conclusion" -> conclusion,
+        )
+        print(s"Params is $params")
         session.run(createArticleQuery, params.asJava)
       })
     } catch {
@@ -198,7 +219,7 @@ class AppDAO(connection: Driver) {
     }
   }
 
-  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate , a.abstractText as abstractText, a.summary as summary  "
+  private val RETURN_ARTICLE = " id(a) AS articleId, a.title as title, a.authors as authors, a.journal as journal, a.pubDate as pubDate , a.abstractText as abstractText, a.summary as summary, a.background as background, a.objectives as objectives, a.methods as methods, a.result as result, a.conclusion as conclusion  "
   def fetchArticles(picoId: Int, pageNo: Int, limit : Int): Future[Seq[Article]] = {
     val skip = max((pageNo - 1) * limit, 0)
     val ORDER_PAGINATION = s" ORDER BY a.title SKIP $skip LIMIT $limit"
@@ -531,7 +552,18 @@ class AppDAO(connection: Driver) {
       journal = record.get("journal").asString(),
       pubDate = record.get("pubDate").asString(),
       abstractText = record.get("abstractText").asString(),
-      summary = Option(record.get("summary").asString())
+      summary = Option(record.get("summary").asString()),
+      abstractComponent = Some(readAbstractComponent(record))
+    )
+  }
+
+  private def readAbstractComponent(record: Record): AbstractComponent = {
+    AbstractComponent(
+      background = Option(record.get("background").asString()),
+      objectives = Option(record.get("objectives").asString()),
+      methods = Option(record.get("methods").asString()),
+      result = Option(record.get("result").asString()),
+      conclusion = Option(record.get("conclusion").asString()),
     )
   }
 
