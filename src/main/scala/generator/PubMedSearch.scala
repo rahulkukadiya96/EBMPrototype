@@ -11,7 +11,7 @@ import java.lang.Math.min
 import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.xml.{Elem, Node, NodeSeq, Utility}
+import scala.xml.{Elem, Node, NodeSeq, Utility, XML}
 
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -174,7 +174,7 @@ object PubMedSearch {
       pubDate = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "JournalIssue" \ "PubDate" \ "Year").text,
       abstractText = (article \ "MedlineCitation" \ "Article" \ "Abstract").text,
       summary = None,
-      abstractComponent = None
+      abstractComponent = toArticleAbstract(article)
     )
   }
 
@@ -196,7 +196,24 @@ object PubMedSearch {
     )
   }*/
 
-  private def toArticleAbstract(abstractComponents: Node): Option[AbstractComponent] = {
+  private def toArticleAbstract(article: Node): Option[AbstractComponent] = {
+    val abstractTexts = (article \ "MedlineCitation" \ "Article" \"Abstract" \ "AbstractText")
+      .map(e => (e \@ "Label", e.text))
+      .toMap
+
+    abstractTexts.foreach { case (label, text) =>
+      println(s"$label: $text")
+    }
+    Some(AbstractComponent(
+      background = abstractTexts.get("BACKGROUND"),
+      objectives = abstractTexts.get("OBJECTIVES"),
+      methods = abstractTexts.get("METHODS"),
+      result = abstractTexts.get("RESULTS"),
+      conclusion = abstractTexts.get("CONCLUSION"),
+    ))
+  }
+
+  /*private def toArticleAbstract(abstractComponents: Node): Option[AbstractComponent] = {
     val xmlString = Utility.serialize(abstractComponents)
     println(xmlString)
     val abstractTexts = abstractComponents \\ "Abstract" \\ "AbstractText"
@@ -217,7 +234,7 @@ object PubMedSearch {
         ))
       case _ => None
     }
-  }
+  }*/
   private def extractAbstractText(abstractComponent: NodeSeq, label: String): Option[String] = {
     val abstractText = abstractComponent \ "AbstractText"
     abstractText.find(_.attribute("Label").exists(_.text == label)).map(_.text.trim)

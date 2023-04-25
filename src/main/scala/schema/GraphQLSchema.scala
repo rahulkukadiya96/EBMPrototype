@@ -653,9 +653,14 @@ object GraphQLSchema {
         "generate_case_report",
         StringType,
         arguments = SoapPatientIdArg :: Nil,
-        resolve = ctx => {
-          val pdfByteArray = getReport() // replace with your function to generate the PDF byte array
-          Base64.getEncoder.encodeToString(pdfByteArray.pdfData)
+        resolve = config => {
+          val dao = config.ctx.dao
+          val soapId = config.arg(SoapPatientIdArg)
+          for {
+            soap <- dao.getSoapData(Seq(soapId))
+            pico <- dao.getPicoDataBySoapId(soapId)
+            articles <- dao.fetchAllArticles(pico.headOption.get.id)
+          } yield getReport(soap.headOption, pico.headOption, articles)
         }
       )
 
