@@ -137,6 +137,10 @@ object ReportGenerator {
     title.setFont(TITLE_FONT)
     document.add(title)
 
+    addParagraph(document, para)
+  }
+
+  private def addParagraph(document : Document, para:String): Unit = {
     val paragraph = new Paragraph(para)
     document.add(paragraph)
   }
@@ -150,7 +154,7 @@ object ReportGenerator {
 
   private def feedArticleSummary(document : Document, articles: Seq[Article]): Unit = {
     addHeading(document, "Articles")
-    articles.filter(_.summary.nonEmpty).foreach(article => addHeading(document, article.summary.get))
+    articles.filter(_.summary.nonEmpty).foreach(article => addParagraph(document, article.summary.get))
   }
 
   private def addPhysicianNote(pdf : PdfDocument): Unit = {
