@@ -4,7 +4,7 @@ import convertor.Preprocessor.getKeywords
 import dao.{AppDAO, MeSHLoaderDao}
 import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
 import generator.StaticMeSHSearch.classifyTerms
-import models.{AbstractComponent, Article, Pico, Response}
+import models.{AbstractComponent, Article, PatientSoap, Pico, Response}
 import schema.DBSchema.config
 
 import java.lang.Math.min
@@ -21,15 +21,27 @@ object PubMedSearch {
   val API_KEY: String = config.getString("ncbi_api_key")
   val API_EMAIL: String = config.getString("ncbi_email")
 
-  def buildQueryWithStaticClassifier(picoD: Option[Pico], dao: MeSHLoaderDao, appDAO: AppDAO): Future[Option[String]] = {
-    picoD match {
-      case Some(pico) =>
+  def buildQueryWithStaticClassifier(soapOption : Option[PatientSoap], picoD: Option[Pico], dao: MeSHLoaderDao): Future[Option[String]] = {
+    (soapOption, picoD) match {
+      case (Some(soap), Some(pico)) =>
         pico.searchQuery match {
           case Some(_) => Future {
             pico.searchQuery
           }
           case None =>
             for {
+              subjective_terms <- classifyTerms(getKeywords(soap.subjectiveNodeData.toString), dao)
+              subjective_search_terms <- subjectHeadingJoiner(subjective_terms.subject_headings)
+
+              objective_terms <- classifyTerms(getKeywords(soap.objective.toString), dao)
+              objective_search_terms <- subjectHeadingJoiner(objective_terms.subject_headings)
+
+              assessment_terms <- classifyTerms(getKeywords(soap.assessment.toString), dao)
+              assessment_search_terms <- subjectHeadingJoiner(assessment_terms.subject_headings)
+
+              /*plan_terms <- classifyTerms(getKeywords(soap.plan.toString), dao)
+              plan_search_terms <- subjectHeadingJoiner(plan_terms.subject_headings)*/
+
               problem_terms <- classifyTerms(getKeywords(pico.problem), dao)
               problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
 
@@ -42,15 +54,14 @@ object PubMedSearch {
               comp_terms <- classifyTerms(getKeywords(pico.comparison.getOrElse("")), dao)
               comparision_search_terms <- subjectHeadingJoiner(comp_terms.subject_headings)
 
-              query <- buildQuery(Option(problem_search_terms), Option(outcome_search_terms), Option(intervention_search_terms), Option(comparision_search_terms))
+              query <- buildQuery(Option(problem_search_terms + subjective_search_terms), Option(outcome_search_terms), Option(intervention_search_terms + objective_search_terms + assessment_search_terms), Option(comparision_search_terms))
             } yield {
               query
             }
         }
-      case None =>
+      case (_, _) =>
         Future {
           None
-          /*Response(empty, 200, Option("No data found"), empty)*/
         }
     }
   }

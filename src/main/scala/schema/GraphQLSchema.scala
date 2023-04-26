@@ -391,9 +391,11 @@ object GraphQLSchema {
         resolve = config => {
           val dao = config.ctx.dao
           val meSHLoaderDao = config.ctx.meSHLoader
+          val soapId = config.arg(Id)
           for {
-            pico <- dao.getPicoDataBySoapId(config.arg(Id))
-            query <- buildQueryWithStaticClassifier(pico.headOption, meSHLoaderDao, dao)
+            patientSoap <- dao.getSoapData(Seq(soapId))
+            pico <- dao.getPicoDataBySoapId(soapId)
+            query <- buildQueryWithStaticClassifier(patientSoap.headOption, pico.headOption, meSHLoaderDao)
           } yield Response(Option.empty, 200, Option("Success"), query)
         }
       ),
