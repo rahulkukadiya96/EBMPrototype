@@ -174,7 +174,7 @@ object PubMedSearch {
       pubDate = (article \ "MedlineCitation" \ "Article" \ "Journal" \ "JournalIssue" \ "PubDate" \ "Year").text,
       abstractText = (article \ "MedlineCitation" \ "Article" \ "Abstract").text,
       summary = None,
-      abstractComponent = toArticleAbstract(article)
+      abstractComponent = None
     )
   }
 

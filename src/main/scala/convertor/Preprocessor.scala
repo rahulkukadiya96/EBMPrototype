@@ -3,16 +3,15 @@ package convertor
 import edu.stanford.nlp.ling.CoreAnnotations.{LemmaAnnotation, PartOfSpeechAnnotation}
 import edu.stanford.nlp.pipeline.{CoreDocument, StanfordCoreNLP}
 import generator.RestExternalCallUtils.summarizeAbstract
-import models.{Article, BaseResponse, Response}
+import models.{Article, ArticleSummaryRequest, ArticleSummaryRequestData, SummaryResponse}
 import play.api.libs.json.Format.GenericFormat
-import play.api.libs.json.{JsArray, JsObject, Json}
+import play.api.libs.json.{JsArray, JsObject, Json, Writes}
 import schema.DBSchema.config
 
 import java.time.Duration
 import java.util.Properties
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 object Preprocessor {
@@ -39,7 +38,7 @@ object Preprocessor {
     list
   }
 
-  def generateAbstract(articles: Seq[Article]): Future[Map[Long, String]] = {
+  def generateAbstractUsingBart(articles: Seq[Article]): Future[Map[Long, String]] = {
     val articleData = articles.filter(article => Option(article).nonEmpty).map(article => (article.id.getOrElse(0), article.abstractText))
     articleData.isEmpty match {
       case true => Future {
@@ -70,6 +69,47 @@ object Preprocessor {
           }
         }
         Future.sequence(futures).map(_.flatten.toMap)
+    }
+  }
+
+  implicit val articleWrites: Writes[ArticleSummaryRequest] = Json.writes[ArticleSummaryRequest]
+  def generateAbstractUsingBioBart(articles: Seq[Article]): Future[Map[Long, String]] = {
+    val articleData = articles.filter(article => Option(article).nonEmpty && article.summary.nonEmpty).map(article => ArticleSummaryRequest(article.id.getOrElse(0), article.abstractText, 100))
+    articleData.nonEmpty match {
+      case false => Future {
+        Map.empty
+      }
+      case true =>
+        val url = config.getString("bio_bart_url")
+        val headers = Map("Content-Type" -> "application/json")
+        val readTimeouts = Duration.ofMinutes(config.getInt("bart_read_timeout")).toMillis.toInt
+        val connectionTimeouts = Duration.ofMinutes(config.getInt("bart_connection_timeout")).toMillis.toInt
+        val batchSize = config.getInt("abstract_batch_size")
+        val chunks = articleData.grouped(batchSize).toSeq
+
+        val futures = chunks.map { chunk =>
+          val payload =  Json.stringify(Json.toJson(ArticleSummaryRequestData(articles = chunk)))
+
+          /*val json = Json.toJson(chunk.map(a => Json.obj(
+            "text" -> a.text,
+            "maxlength" -> a.maxLength,
+            "id" -> a.id
+          )))
+          val payload = Json.stringify(Json.obj("articles" -> json))
+          */
+
+
+
+          Future {
+            val response = summarizeAbstract(url,  headers, payload, readTimeouts, connectionTimeouts)
+            val summaryResponse: SummaryResponse = Json.parse(response.text).as[SummaryResponse]
+            summaryResponse.success match {
+              case true => summaryResponse.data.map(summaryData => (summaryData.id, summaryData.summary)).toMap
+              case false => Map.empty
+            }
+          }
+        }
+          Future.sequence(futures).map(_.flatten.toMap)
     }
   }
 

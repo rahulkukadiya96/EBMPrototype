@@ -2,7 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import convertor.Preprocessor.generateAbstract
+import convertor.Preprocessor.generateAbstractUsingBioBart
 import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
 import generator.ReportGenerator.getReport
 import models._
@@ -11,10 +11,8 @@ import sangria.execution.deferred.{DeferredResolver, Fetcher, Relation, Relation
 import sangria.macros.derive._
 import sangria.schema._
 import spray.json.DefaultJsonProtocol._
-import spray.json.{DeserializationException, JsString, JsValue, RootJsonFormat}
-import utility.DateTimeFormatUtil
 import spray.json._
-import sangria.marshalling._
+import utility.DateTimeFormatUtil
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -635,7 +633,8 @@ object GraphQLSchema {
           for {
             pico <- dao.getPicoDataBySoapId(soapId)
             articles <- dao.fetchAllArticles(pico.headOption.get.id)
-            articleSummary <- generateAbstract(articles)
+            /*articleSummary <- generateAbstractUsingBart(articles)*/
+            articleSummary <- generateAbstractUsingBioBart(articles)
             isSaved <- dao.saveArticleSummary(articleSummary)
           } yield BaseResponse(statusCode = 200, message = Some("Success"))
         }
