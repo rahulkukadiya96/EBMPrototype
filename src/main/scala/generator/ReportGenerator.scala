@@ -4,30 +4,24 @@ import com.itextpdf.forms.PdfAcroForm
 import com.itextpdf.forms.fields.PdfFormField
 import com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD
 import com.itextpdf.io.image.ImageDataFactory
-import com.itextpdf.kernel.font.{PdfFont, PdfFontFactory}
+import com.itextpdf.kernel.font.PdfFontFactory
 import com.itextpdf.kernel.geom.Rectangle
 import com.itextpdf.kernel.pdf.canvas.draw.SolidLine
 import com.itextpdf.kernel.pdf.{PdfDocument, PdfWriter}
 import com.itextpdf.layout.Document
 import com.itextpdf.layout.element.{Image, LineSeparator, Paragraph}
 import com.itextpdf.layout.properties.HorizontalAlignment
-import models.{Article, PatientSoap, Pico}
+import models.{Article, Patient, PatientSoap, Pico}
 import schema.DBSchema.config
 
 import java.io.FileOutputStream
 import java.nio.file.Paths
-import java.util.UUID
 import java.util.UUID.randomUUID
 
 
 object ReportGenerator {
-  val BOLD = "Bold"
   private lazy val TEMP_OUTPUT_PATH = config.getString("temp_output_report_path")
   private lazy val REPORT_LOGO_PATH = config.getString("report_logo_path")
-
-  private lazy val BOLD_FONT: PdfFont = PdfFontFactory.createFont(HELVETICA_BOLD)
-
-  private lazy val TITLE_FONT = BOLD_FONT
 
 
 
@@ -66,9 +60,9 @@ object ReportGenerator {
     Pdf(pdfData)
   }*/
 
-  def getReport(patientSoap: Option[PatientSoap], picoOption: Option[Pico], articles: Seq[Article]): String = {
-    (patientSoap, picoOption) match {
-      case (Some(soap), Some(pico)) => {
+  def getReport(patientOp : Option[Patient], patientSoap: Option[PatientSoap], picoOption: Option[Pico], articles: Seq[Article]): String = {
+    (patientOp, patientSoap, picoOption) match {
+      case (Some(patient), Some(soap), Some(pico)) => {
         val filePath = Paths.get(TEMP_OUTPUT_PATH, s"report_${randomUUID()}.pdf").toString
         val fileOutputStream = new FileOutputStream(filePath)
         val pdfWriter = new PdfWriter(fileOutputStream)
@@ -77,6 +71,9 @@ object ReportGenerator {
 
         // Add logo image to the PDF
         addLogo(doc)
+
+        // Add patient basic details
+        feedPatientDetails(doc, patient)
 
         // ADD SOAP
         feedSOAP(doc, soap)
@@ -96,8 +93,8 @@ object ReportGenerator {
 
         "SUCCESS"
       }
-      case (_, _) =>
-        "No SOAP or PICO Found"
+      case (_, _, _) =>
+        "No SOAP or PICO or Patient Found"
     }
   }
 
@@ -115,8 +112,15 @@ object ReportGenerator {
     doc.add(line)
   }
 
+  private def feedPatientDetails(document : Document, patient : Patient) = {
+    addHeading(document, "Background")
+    addTitleWithParagraph(document, "Name", patient.name)
+    addTitleWithParagraph(document, "Age", patient.age.toString)
+    addTitleWithParagraph(document, "Address", patient.address)
+  }
+
   private def feedSOAP(document: Document, soap : PatientSoap): Unit = {
-    addHeading(document, "SOAP Note")
+    addHeading(document, "Case Presentation")
     addTitleWithParagraph(document, "Subject", soap.subjectiveNodeData.toString)
     addTitleWithParagraph(document, "Object", soap.objective.toString)
     addTitleWithParagraph(document, "Assessment", soap.assessment.toString)
@@ -124,17 +128,19 @@ object ReportGenerator {
   }
 
   private def feedPICO(document: Document, pico : Pico): Unit = {
-    addHeading(document, "PICO Note")
+    addHeading(document, "Methods")
     addTitleWithParagraph(document, "Patient/Problem", pico.problem)
     addTitleWithParagraph(document, "Intervention", pico.intervention)
     addTitleWithParagraph(document, "Comparison", pico.comparison.getOrElse(""))
     addTitleWithParagraph(document, "Outcome", pico.outcome)
     addTitleWithParagraph(document, "Time", pico.timePeriod.getOrElse(""))
+
+    addParagraph(document, "The Research data is gathered from the PubMed Database")
   }
 
   private def addTitleWithParagraph(document: Document, titleText : String, para: String): Unit = {
     val title = new Paragraph(titleText)
-    title.setFont(TITLE_FONT)
+    title.setFont(PdfFontFactory.createFont(HELVETICA_BOLD))
     document.add(title)
 
     addParagraph(document, para)
@@ -147,20 +153,20 @@ object ReportGenerator {
 
   private def addHeading(document: Document, headingText: String ) {
     val heading = new Paragraph(headingText)
-    heading.setFont(BOLD_FONT)
+    heading.setFont(PdfFontFactory.createFont(HELVETICA_BOLD))
     heading.setFontSize(20f)
     document.add(heading)
   }
 
   private def feedArticleSummary(document : Document, articles: Seq[Article]): Unit = {
-    addHeading(document, "Articles")
+    addHeading(document, "Results")
     articles.filter(_.summary.nonEmpty).foreach(article => addParagraph(document, article.summary.get))
   }
 
   private def addPhysicianNote(pdf : PdfDocument): Unit = {
     val rect = new Rectangle(100f, 600f, 1000f, 200f)
     val acroForm = PdfAcroForm.getAcroForm(pdf, true)
-    val field = PdfFormField.createText(pdf, rect, "Notes")
+    val field = PdfFormField.createText(pdf, rect, "Conclusion")
     acroForm.addField(field)
   }
 }

@@ -39,9 +39,6 @@ object PubMedSearch {
               assessment_terms <- classifyTerms(getKeywords(soap.assessment.toString), dao)
               assessment_search_terms <- subjectHeadingJoiner(assessment_terms.subject_headings)
 
-              /*plan_terms <- classifyTerms(getKeywords(soap.plan.toString), dao)
-              plan_search_terms <- subjectHeadingJoiner(plan_terms.subject_headings)*/
-
               problem_terms <- classifyTerms(getKeywords(pico.problem), dao)
               problem_search_terms <- subjectHeadingJoiner(problem_terms.subject_headings)
 

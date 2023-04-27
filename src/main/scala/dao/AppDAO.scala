@@ -13,8 +13,10 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.FutureConverters
 
 class AppDAO(connection: Driver) {
+  private val returnPatientGenQuery = s" RETURN ID(patient) as id, patient.name as name, patient.age as age, patient.address as address, patient.createAt as createAt"
+
   def createPatient(patient: Patient): Future[Patient] = {
-    val queryString = s"CREATE (patient : Patient{name : '${patient.name}', age : ${patient.age}, address : '${patient.address}', createAt : ${getTodayDateTimeNeo4j(patient.createdAt)} }) RETURN ID(patient) as id, patient.name as name, patient.age as age, patient.address as address, patient.createAt as createAt"
+    val queryString = s"CREATE (patient : Patient{name : '${patient.name}', age : ${patient.age}, address : '${patient.address}', createAt : ${getTodayDateTimeNeo4j(patient.createdAt)} }) " + returnPatientGenQuery
     writeData(queryString, readPatient)
   }
 
@@ -380,6 +382,11 @@ class AppDAO(connection: Driver) {
   def getPicoDataBySoapId(soapId: Int): Future[Seq[Pico]] = {
     val queryString = s"MATCH (pico : Pico)-[k:pico_soap]->(patientSOAP:Patient_SOAP) WHERE k.patientSOAPId =$soapId RETURN " + returnPicoGenQuery
     getData(queryString, readPico)
+  }
+
+  def getPatientDataBySoapId(soapId: Int): Future[Seq[Patient]] = {
+    val queryString = s"MATCH (soap:Patient_SOAP)-[r:soap_patient]->(patient :Patient) WHERE ID(soap) =$soapId " + returnPatientGenQuery
+    getData(queryString, readPatient)
   }
 
 

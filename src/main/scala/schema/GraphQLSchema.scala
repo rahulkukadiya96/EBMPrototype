@@ -659,9 +659,10 @@ object GraphQLSchema {
           val soapId = config.arg(SoapPatientIdArg)
           for {
             soap <- dao.getSoapData(Seq(soapId))
+            patient <- dao.getPatientDataBySoapId(soapId)
             pico <- dao.getPicoDataBySoapId(soapId)
             articles <- dao.fetchAllArticles(pico.headOption.get.id)
-          } yield getReport(soap.headOption, pico.headOption, articles)
+          } yield getReport(patient.headOption, soap.headOption, pico.headOption, articles)
         }
       )
 
