@@ -4,11 +4,16 @@ import com.itextpdf.forms.PdfAcroForm
 import com.itextpdf.forms.fields.PdfFormField
 import com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD
 import com.itextpdf.io.image.ImageDataFactory
+import com.itextpdf.kernel.colors.ColorConstants.BLUE
+import com.itextpdf.kernel.colors.{ColorConstants, DeviceRgb}
 import com.itextpdf.kernel.font.PdfFontFactory
 import com.itextpdf.kernel.geom.Rectangle
+import com.itextpdf.kernel.pdf.annot.PdfAnnotation
+import com.itextpdf.kernel.pdf.annot.PdfAnnotation.STYLE_BEVELED
 import com.itextpdf.kernel.pdf.canvas.draw.SolidLine
-import com.itextpdf.kernel.pdf.{PdfDocument, PdfWriter}
+import com.itextpdf.kernel.pdf.{PdfArray, PdfDictionary, PdfDocument, PdfName, PdfWriter}
 import com.itextpdf.layout.Document
+import com.itextpdf.layout.borders.SolidBorder
 import com.itextpdf.layout.element.{Image, LineSeparator, Paragraph}
 import com.itextpdf.layout.properties.HorizontalAlignment
 import models.{Article, Patient, PatientSoap, Pico}
@@ -83,8 +88,10 @@ object ReportGenerator {
 
         // ADD Articles
         feedArticleSummary(doc, articles)
+
         // ADD Physician Note field
-        /*addPhysicianNote(pdfDoc)*/
+        addHeading(doc, "Conclusion")
+        addPhysicianNote(pdfDoc, doc)
 
         doc.close()
         pdfDoc.close()
@@ -163,10 +170,16 @@ object ReportGenerator {
     articles.filter(_.summary.nonEmpty).foreach(article => addParagraph(document, article.summary.get))
   }
 
-  private def addPhysicianNote(pdf : PdfDocument): Unit = {
-    val rect = new Rectangle(100f, 600f, 1000f, 200f)
+  private def addPhysicianNote(pdf : PdfDocument, doc : Document): Unit = {
+    val freeBBox = doc.getRenderer.getCurrentArea.getBBox
+    val top = freeBBox.getTop
+    val fieldHeight = 100f;
+    val rect = new Rectangle(freeBBox.getLeft, top - fieldHeight, 550f, fieldHeight)
     val acroForm = PdfAcroForm.getAcroForm(pdf, true)
-    val field = PdfFormField.createText(pdf, rect, "Conclusion")
+    val field = PdfFormField.createText(pdf, rect, "Conclusion", "")
+    field.setMultiline(true)
+    field.getWidgets.get(0).setBorderStyle(STYLE_BEVELED)
+    field.setBorderWidth(2).setBorderColor(BLUE)
     acroForm.addField(field)
   }
 }
