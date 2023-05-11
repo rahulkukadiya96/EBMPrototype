@@ -2,7 +2,7 @@ package schema
 
 import config.MyContext
 import convertor.ConvertorUtils.transformList
-import convertor.Preprocessor.generateAbstractUsingBioBart
+import convertor.Preprocessor.{generateAbstractUsingBioBart, getAvgScore}
 import generator.PubMedSearch.{buildQueryWithStaticClassifier, executeQuery, totalPages}
 import generator.ReportGenerator.getReport
 import models._
@@ -413,6 +413,20 @@ object GraphQLSchema {
             totalPages <- totalPages(cnt, limit)
             articles <- dao.fetchArticles(pico.headOption.get.id, config.arg(PageNo), limit)
           } yield ArticleListResponse(200, Option("Success"), Option(totalPages), Option(articles))
+        }
+      ),
+      Field(
+        "fetch_score",
+        OptionType(ArticleListResponseType),
+        arguments = Id :: Nil,
+        resolve = config => {
+          val dao = config.ctx.dao
+
+          for {
+            pico <- dao.getPicoDataBySoapId(config.arg(Id))
+            scoresList <- dao.fetchScoresForAllArticles(pico.headOption.get.id)
+            score <- getAvgScore(scoresList)
+          } yield ArticleListResponse(200, Option(score), None, None)
         }
       )
     )

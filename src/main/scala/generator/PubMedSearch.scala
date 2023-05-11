@@ -4,14 +4,14 @@ import convertor.Preprocessor.getKeywords
 import dao.{AppDAO, MeSHLoaderDao}
 import generator.ExternalCallUtils.{callApi, extractCountFromXml, extractIdFromXml, urlEncode}
 import generator.StaticMeSHSearch.classifyTerms
-import models.{AbstractComponent, Article, PatientSoap, Pico, Response}
+import models._
 import schema.DBSchema.config
 
 import java.lang.Math.min
 import scala.Option.empty
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.xml.{Elem, Node, NodeSeq, Utility, XML}
+import scala.xml.{Elem, Node, NodeSeq}
 
 object PubMedSearch {
   val BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -102,7 +102,7 @@ object PubMedSearch {
   }
 
   def executeQuery(pico : Option[Pico], query: Option[String], appDao : AppDAO, limit : Int): Future[Response] = {
-    val pageSize = 5
+    val pageSize = 1
     query match {
       case Some(queryStr) =>
         pico match {

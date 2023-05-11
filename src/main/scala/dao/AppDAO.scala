@@ -2,6 +2,7 @@ package dao
 
 import models._
 import org.neo4j.driver.v1.{Driver, Record}
+import play.api.libs.json.Json.{stringify, toJson}
 import utility.DateTimeFormatUtil.getCurrentUTCTime
 
 import java.lang.Math.{max, min}
@@ -188,7 +189,7 @@ class AppDAO(connection: Driver) {
           "result" -> result,
           "conclusion" -> conclusion,
         )
-        print(s"Params is $params")
+        /*print(s"Params is $params")*/
         session.run(createArticleQuery, params.asJava)
       })
     } catch {
@@ -199,8 +200,8 @@ class AppDAO(connection: Driver) {
     }
   }
 
-  def saveArticleSummary(summaries: Map[Long, String]): Future[Boolean] = Future {
-    val query = "MATCH (a:Article) WHERE ID(a) = $articleId SET a.summary = $summary RETURN ID(a) AS articleId"
+  def saveArticleSummary(summaries: Map[Long, ArticleSummaryResponse]): Future[Boolean] = Future {
+    val query = "MATCH (a:Article) WHERE ID(a) = $articleId SET a.summary = $summary, a.score = $score RETURN ID(a) AS articleId"
     val session = connection.session()
     try {
       /*summaries.map { case (articleId, summary) =>
@@ -208,7 +209,7 @@ class AppDAO(connection: Driver) {
         session.run(query, params.asJava)
       }*/
       summaries.foreach(entry => {
-        val params: Map[String, AnyRef] = Map("articleId" -> entry._1.asInstanceOf[AnyRef], "summary" -> entry._2)
+        val params: Map[String, AnyRef] = Map("articleId" -> entry._1.asInstanceOf[AnyRef], "summary" -> entry._2.summary, "score" ->  entry._2.score)
         session.run(query, params.asJava)
       })
       true
@@ -232,6 +233,11 @@ class AppDAO(connection: Driver) {
   def fetchAllArticles(picoId: Int): Future[Seq[Article]] = {
     val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN " + RETURN_ARTICLE
     getData(queryString, readArticle)
+  }
+
+  def fetchScoresForAllArticles(picoId: Int): Future[Seq[String]] = {
+    val queryString = s" MATCH (n:Pico) - [:HAS_ARTICLE] -> (a:Article) WHERE ID(n) = $picoId   RETURN a.score as score"
+    getData(queryString, readScore)
   }
 
   def fetchArticleCount(picoId: Int): Future[Int] = {
@@ -396,6 +402,12 @@ class AppDAO(connection: Driver) {
       deleteNode(queryString)
     }
   }
+
+  /*def printSoapData(soapId : Int, path : String) : Future[Boolean] = {
+    val queryString = s"MATCH (soap:Patient_SOAP)-[r:soap_patient]->(patient :Patient) WHERE ID(soap) =$soapId RETURN soap, patient"
+    val session = connection.session()
+    session.run(queryString).single().get("soap patient").asGraph().exportTo("neo4j-graph.png")
+  }*/
 
   private def writeData[T](query: String, reader: Record => T) = {
     val session = connection.session()
@@ -562,6 +574,10 @@ class AppDAO(connection: Driver) {
       summary = Option(record.get("summary").asString()),
       abstractComponent = Some(readAbstractComponent(record))
     )
+  }
+
+  private def readScore(record: Record) : String = {
+    record.get("score").asString()
   }
 
   private def readAbstractComponent(record: Record): AbstractComponent = {

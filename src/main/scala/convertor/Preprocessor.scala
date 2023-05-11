@@ -3,13 +3,15 @@ package convertor
 import edu.stanford.nlp.ling.CoreAnnotations.{LemmaAnnotation, PartOfSpeechAnnotation}
 import edu.stanford.nlp.pipeline.{CoreDocument, StanfordCoreNLP}
 import generator.RestExternalCallUtils.summarizeAbstract
-import models.{Article, ArticleSummaryRequest, ArticleSummaryRequestData, SummaryResponse}
+import models.{Article, ArticleSummaryRequest, ArticleSummaryRequestData, ArticleSummaryResponse, RougeScore, RougeScores, SummaryResponse}
 import play.api.libs.json.Format.GenericFormat
+import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json.{JsArray, JsObject, Json, Writes}
 import schema.DBSchema.config
 
 import java.time.Duration
 import java.util.Properties
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -55,7 +57,7 @@ object Preprocessor {
 
         val chunks = articleData.grouped(config.getInt("abstract_batch_size")).toList
         val futures = chunks.map { chunk =>
-          val text = Json.toJson(chunk.map(_._2))
+          val text = toJson(chunk.map(_._2))
           val payload = s""" {"inputs": $text, "parameters": $parameters } """
           Future {
             val response = summarizeAbstract(url, headers, payload, readTimeouts, connectionTimeouts)
@@ -73,7 +75,7 @@ object Preprocessor {
   }
 
   implicit val articleWrites: Writes[ArticleSummaryRequest] = Json.writes[ArticleSummaryRequest]
-  def generateAbstractUsingBioBart(articles: Seq[Article]): Future[Map[Long, String]] = {
+  def generateAbstractUsingBioBart(articles: Seq[Article]): Future[Map[Long, ArticleSummaryResponse]] = {
     val articleData = articles.filter(article => Option(article).nonEmpty && article.summary.nonEmpty).map(article => ArticleSummaryRequest(article.id.getOrElse(0), article.abstractText, 100))
     articleData.nonEmpty match {
       case false => Future {
@@ -88,7 +90,7 @@ object Preprocessor {
         val chunks = articleData.grouped(batchSize).toSeq
 
         val futures = chunks.map { chunk =>
-          val payload =  Json.stringify(Json.toJson(ArticleSummaryRequestData(articles = chunk)))
+          val payload =  stringify(toJson(ArticleSummaryRequestData(articles = chunk)))
 
           /*val json = Json.toJson(chunk.map(a => Json.obj(
             "text" -> a.text,
@@ -104,13 +106,25 @@ object Preprocessor {
             val response = summarizeAbstract(url,  headers, payload, readTimeouts, connectionTimeouts)
             val summaryResponse: SummaryResponse = Json.parse(response.text).as[SummaryResponse]
             summaryResponse.success match {
-              case true => summaryResponse.data.map(summaryData => (summaryData.id, summaryData.summary)).toMap
+              case true => summaryResponse.data.map(summaryData => (summaryData.id, summaryData)).toMap
               case false => Map.empty
             }
           }
         }
           Future.sequence(futures).map(_.flatten.toMap)
     }
+  }
+
+  def getAvgScore(scores: Seq[String]): Future[String] = Future {
+    val scoreList = scores.map(score => score.replaceAll( "'", "\"")).map(score => Json.parse(score).as[RougeScores])
+    val averageRougeScores: RougeScores = scoreList.foldLeft(RougeScores(RougeScore(0, 0, 0), RougeScore(0, 0, 0), RougeScore(0, 0, 0))) { (acc, curr) =>
+      RougeScores(
+        RougeScore((acc.rouge1.r + curr.rouge1.r) / 2, (acc.rouge1.p + curr.rouge1.p) / 2, (acc.rouge1.f + curr.rouge1.f) / 2),
+        RougeScore((acc.rouge2.r + curr.rouge2.r) / 2, (acc.rouge2.p + curr.rouge2.p) / 2, (acc.rouge2.f + curr.rouge2.f) / 2),
+        RougeScore((acc.rougel.r + curr.rougel.r) / 2, (acc.rougel.p + curr.rougel.p) / 2, (acc.rougel.f + curr.rougel.f) / 2)
+      )
+    }
+    Json.toJson(averageRougeScores).toString()
   }
 
   /*def generateAbstract(articles : Seq[Article]): Future[Map[String, String]] = Future {
